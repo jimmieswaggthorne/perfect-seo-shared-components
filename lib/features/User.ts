@@ -1,6 +1,6 @@
 "use client";
 
-import { SettingsProps, GoogleUser, Profile, PreferencesProps, QueueItemProps, ToastProps } from "@/perfect-seo-shared-components/data/types";
+import { SettingsProps, GoogleUser, Profile, PreferencesProps, ToastProps, Schema } from "@/perfect-seo-shared-components/data/types";
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
@@ -14,10 +14,10 @@ export type RootState = {
   domainInfo: Partial<PreferencesProps>[]
   profile: Profile,
   settings: SettingsProps
-  queue: QueueItemProps[],
   loading: LoadingStates[],
   toasts: ToastProps[]
-  show_queue: boolean;
+  schema: Schema[]
+  modalsOpen: boolean;
 };
 
 export type LoadingStates = {
@@ -29,19 +29,18 @@ const initialState: RootState = {
   user: null,
   points: 0,
   isLoading: true,
-  isLoggedIn: null,
+  isLoggedIn: false,
   isAdmin: false,
   profile: null,
   settings: null,
   domainAccessInfo: [],
   domainInfo: [],
-  queue: [],
   loading: [
     { loading: false, key: 'user' },
   ],
   toasts: [],
-  show_queue: false
-
+  schema: [],
+  modalsOpen: false
 };
 
 export const UserSlice = createSlice({
@@ -105,6 +104,13 @@ export const UserSlice = createSlice({
         domainInfo: action.payload
       }
     },
+    setModalsOpen: (state, action: PayloadAction<boolean>) => {
+      console.log("Setting modals open to", action.payload);
+      return {
+        ...state,
+        modalsOpen: action.payload
+      }
+    },
     updateDomainInfo: (state, action: PayloadAction<Partial<PreferencesProps>>) => {
       let preferences = action.payload;
       if (state?.domainInfo?.length === 0) {
@@ -136,45 +142,6 @@ export const UserSlice = createSlice({
             domainInfo
           }
         }
-      }
-    },
-    setQueue: (state, action: PayloadAction<QueueItemProps[]>) => {
-      return {
-        ...state,
-        queue: action.payload,
-      }
-    },
-    updateQueueItem: (state, action: PayloadAction<QueueItemProps>) => {
-      let queue = state.queue.map((item) => {
-        if (item.id === action.payload.id) {
-          return { ...item, ...action.payload };
-        }
-        else {
-          return item;
-        }
-      });
-      return {
-        ...state,
-        queue
-      }
-    },
-    addQueueItem: (state, action: PayloadAction<QueueItemProps>) => {
-      return {
-        ...state,
-        queue: [...state.queue, action.payload]
-      }
-    },
-    removeQueueItem: (state, action: PayloadAction<QueueItemProps>) => {
-      let queue = state.queue.filter((item) => item.id !== action.payload.id);
-      return {
-        ...state,
-        queue
-      }
-    },
-    clearQueue: (state) => {
-      return {
-        ...state,
-        queue: []
       }
     },
     setLoader: (state, action: PayloadAction<LoadingStates>) => {
@@ -215,17 +182,17 @@ export const UserSlice = createSlice({
         toasts: []
       }
     },
-    setShowQueue: (state, action: PayloadAction<boolean>) => {
+    setSchema: (state, action: PayloadAction<Schema[]>) => {
       return {
         ...state,
-        show_queue: action.payload
+        schema: action.payload
       }
     }
   }
 });
 
 // Action creators are generated for each case reducer function
-export const { setUser, setProfile, updatePoints, setLoggedIn, setLoading, setAdmin, setDomainInfo, setDomainAccess, reset, setUserSettings, updateDomainInfo, setQueue, updateQueueItem, clearQueue, setLoader, addQueueItem, removeQueueItem, removeToast, addToast, clearToasts, setShowQueue } = UserSlice.actions;
+export const { setUser, setProfile, updatePoints, setLoggedIn, setLoading, setAdmin, setDomainInfo, setDomainAccess, reset, setUserSettings, updateDomainInfo, setLoader, removeToast, addToast, clearToasts, setSchema, setModalsOpen } = UserSlice.actions;
 
 // Selectors
 export const selectUser = (state: RootState) => state?.user;
@@ -236,12 +203,12 @@ export const selectIsLoggedIn = (state: RootState) => state?.isLoggedIn;
 export const selectIsAdmin = (state: RootState) => state?.isAdmin;
 export const selectDomainsInfo = (state: RootState) => state?.domainInfo;
 export const selectSettings = (state: RootState) => state?.settings;
-export const selectEmail = (state: RootState) => state?.profile?.email;
+export const selectEmail = (state: RootState) => state?.user?.email;
 export const selectDomains = (state: RootState) => state?.profile?.domain_access;
-export const selectQueue = (state: RootState) => state?.queue;
 export const selectLoader = (state: RootState) => state?.loading;
 export const selectDomainInfo = (key: string) => (state: RootState) => state?.domainInfo?.find((domain) => domain.domain_name === key || domain.domain === key);
 export const selectToasts = (state: RootState) => state?.toasts;
-export const selectShowQueue = (state: RootState) => state?.show_queue;
+export const selectSchema = (state: RootState) => state?.schema;
+export const selectModalsOpen = (state: RootState) => state.modalsOpen;
 
 export default UserSlice.reducer;

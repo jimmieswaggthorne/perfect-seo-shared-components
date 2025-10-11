@@ -18,16 +18,16 @@
     max-height: 350px;
     min-height: 3em;
 
-    &_button {
-      padding-right: 55px;
-    }
-
     &_disabled {
-
       background-color: transparent !important;
       border: none !important;
       padding: 0 !important;
     }
+
+    &_button {
+      padding-right: 55px !important;
+    }
+
 
 
     &_withError {

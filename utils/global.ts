@@ -350,3 +350,30 @@ export const getNumberSuffix = (number: number) => {
       return 'th';
   }
 };
+
+/**
+ * Helper function to download a file to the user's device
+ * @param content - The file content as string
+ * @param filename - The filename to download as
+ * @param mimeType - The MIME type of the file
+ */
+export const downloadFile = (content: string, filename: string, mimeType: string = 'text/plain') => {
+  console.log('📥 [downloadFile] Starting download for:', filename);
+
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+
+  document.body.appendChild(link);
+  link.click();
+
+  // Cleanup
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  console.log('📥 [downloadFile] ✅ Download initiated for:', filename);
+};

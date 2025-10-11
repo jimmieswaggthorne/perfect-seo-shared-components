@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import styles from "./CreateContentModal.module.scss";
 import OutlineRow from "./OutlineRow/OutlineRow";
-import { OutlineRowProps, QueueItemProps } from '@/perfect-seo-shared-components/data/types'
+import { OutlineRowProps } from '@/perfect-seo-shared-components/data/types'
 import useForm from "@/perfect-seo-shared-components/hooks/useForm";
 import Form from "@/perfect-seo-shared-components/components/Form/Form";
 import * as Modal from "@/perfect-seo-shared-components/components/Modal/Modal";
@@ -10,11 +10,11 @@ import TextInput from "@/perfect-seo-shared-components/components/Form/TextInput
 import useViewport from "@/perfect-seo-shared-components/hooks/useViewport";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
-import { GenerateContentPost, GetPostOutlineRequest, SaveContentPost } from "@/perfect-seo-shared-components/data/requestTypes";
-import { fetchOutlineStatus, getContentPlanOutline, saveContentPlanPost } from "@/perfect-seo-shared-components/services/services";
+import { GenerateContentPost, GetPostOutlineRequest, RegeneratePost, SaveContentPost } from "@/perfect-seo-shared-components/data/requestTypes";
+import { fetchOutlineData, patchOutlineTitle, regenerateHTML, regenerateHTMLfromDoc, saveContentPlanPost } from "@/perfect-seo-shared-components/services/services";
 import { createPost, regenerateOutline } from "@/perfect-seo-shared-components/services/services";
 import Loader from "@/perfect-seo-shared-components/components/Loader/Loader";
-import { selectEmail, selectPoints } from "@/perfect-seo-shared-components/lib/features/User";
+import { selectEmail } from "@/perfect-seo-shared-components/lib/features/User";
 import RegeneratePostModal, { GenerateTypes } from "../RegeneratePostModal/RegeneratePostModal";
 import { createClient } from "@/perfect-seo-shared-components/utils/supabase/client";
 
@@ -25,6 +25,7 @@ interface CreateContentModalProps {
   contentPlan?: any;
   titleChange?: (e: any, title: string, index: number) => any;
   index?: number;
+  regenerateHandler: () => void
   isAuthorized: boolean;
   standalone?: boolean;
   track?: boolean;
@@ -35,13 +36,10 @@ const CreateContentModal = ({
   data,
   onClose,
   contentPlan,
-  titleChange,
   isAuthorized,
-  index,
-  advancedData,
+  regenerateHandler,
   standalone,
   generatePost,
-  track
 }: CreateContentModalProps) => {
   const [loading, setLoading] = useState(true);
   const [tableData, setTableData] = useState<OutlineRowProps[]>(null);
@@ -55,17 +53,17 @@ const CreateContentModal = ({
   const [creatingPost, setCreatingPost] = useState(generatePost || false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const supabase = createClient()
   const router = useRouter();
-  const points = useSelector(selectPoints)
   const email = useSelector(selectEmail)
   const searchParams = useSearchParams();
   const queryParam = searchParams.get('generate');
   const pathname = usePathname()
+  const supabase = createClient();
 
-
-  const closeHandler = () => {
+  const closeHandler = (e?) => {
+    if (e) {
+      e.preventDefault();
+    }
     form.setState({});
     onClose();
   }
@@ -74,6 +72,9 @@ const CreateContentModal = ({
     if (data?.post_title || data?.["Post Title"] || data?.title) {
       titleForm.setState({ title: data["Post Title"] || data?.post_title || data?.title });
       setPostTitle(data["Post Title"] || data?.post_title || data?.title);
+    }
+    if (data?.outline?.guid) {
+      setOutlineGUID(data.outline.guid)
     }
   }, [data]);
 
@@ -89,35 +90,29 @@ const CreateContentModal = ({
     }
   }, [queryParam]);
 
-
-
-  useEffect(() => {
-    setSaved(false)
-  }), [titleForm?.getState?.title]
-
-  const titleChangeHandler = (e) => {
-    e.preventDefault();
-
-    if (titleChange) {
-      setSaving(true);
-      titleChange(null, titleForm.getState.title, index)
-        .then(res => {
-          setSaved(true);
-          setSaving(false);
-        })
-        .catch(err => {
-          setSaving(false)
-
-        }
-        )
+  const titleChangeHandler = (e?) => {
+    if (e) {
+      e.preventDefault();
     }
+    setSaving(true)
+    patchOutlineTitle(outlineGUID, titleForm.getState.title)
+      .then(res => {
+        setSaved(true);
+        setSaving(false);
+      })
+      .catch(err => {
+        setSaving(false)
+
+      }
+      )
   }
 
+
   const TitleSaveButton = () => {
-    if (!isAuthorized || standalone) return ''
+    if (!isAuthorized) return ''
     return (
       <div className="d-flex h-100 align-items-center justify-content-center">
-        <button className="btn btn-transparent d-flex align-items-center justify-content-center" onClick={titleChangeHandler} title="Save Live Url" disabled={saving}>
+        <button className="btn btn-transparent text-primary d-flex align-items-center justify-content-center" onClick={titleChangeHandler} title="Save Live Url" disabled={saving}>
 
           {saving ?
             <div className="spinner-border spinner-border-sm" role="status">
@@ -177,27 +172,45 @@ const CreateContentModal = ({
   };
 
   const convertToTableData = (object) => {
-    return Object.keys(object).reduce((prev, curr) => {
-      if (curr.startsWith("heading-")) {
-        let headingIndex = curr.split("-")[1];
-        let newHeading = {
-          title: object[curr],
-          subheadings: Object.keys(object)
-            .filter((key) => {
-              return key.startsWith(`${headingIndex}-subheading`);
-            })
-            .reduce((sPrev, sCurr, i) => {
-              let subheadingKey = `${headingIndex}-subheading-`;
+    try {
+      // First get all unique heading indices
+      const headingIndices = Object.keys(object)
+        .filter(key => key.startsWith("heading-"))
+        .map(key => key.split("-")[1]);
 
-              return [...sPrev, object[`${subheadingKey}${i}`]];
-            }, []),
+      // Build sections properly
+      return headingIndices.map(headingIndex => {
+        // Get the title for this heading
+        const title = object[`heading-${headingIndex}`] || '';
+
+        // Find all subheadings for this heading
+        const subheadingPattern = new RegExp(`^${headingIndex}-subheading-\\d+$`);
+        const subheadingKeys = Object.keys(object)
+          .filter(key => subheadingPattern.test(key))
+          .sort((a, b) => {
+            const aIndex = parseInt(a.split('-')[2]);
+            const bIndex = parseInt(b.split('-')[2]);
+            return aIndex - bIndex;
+          });
+
+        // Map subheadings to strings, ensuring no null or undefined values
+        const subheadings = subheadingKeys.map(key => object[key] || '');
+
+        // Ensure we have at least one subheading, even if empty
+        if (subheadings.length === 0) {
+          subheadings.push('');
+        }
+
+        return {
+          title,
+          subheadings
         };
-
-        return [...prev, newHeading];
-      } else {
-        return prev;
-      }
-    }, []);
+      });
+    } catch (error) {
+      console.error('Error converting form data to table data:', error);
+      // Return a minimal valid structure to prevent crashes
+      return [{ title: '', subheadings: [''] }];
+    }
   };
 
   const deleteSubheading = (headingIndex: number, index: number) => {
@@ -231,64 +244,21 @@ const CreateContentModal = ({
 
   const pullOutline = (initial?) => {
     setLoading(true);
-    if (data.guid) {
-      setOutlineGUID(data.guid)
+    let guid = data?.outline?.guid || data.guid;
+    if (guid) {
+      setOutlineGUID(guid)
     }
-    if (standalone) {
-      fetchOutlineStatus(data.content_plan_outline_guid)
-        .then(res => {
-          if (res?.data?.outline?.sections?.length > 0) {
-            processSections(res.data.outline.sections, initial);
+
+    fetchOutlineData(guid)
+      .then(res => {
+        if (res.data[0]?.outline) {
+          let outline = JSON.parse(res.data[0].outline)
+          if (outline?.sections?.length > 0) {
+            processSections(outline.sections, initial);
             setLoading(false)
           }
-        })
-    } else {
-      let reqObj: GetPostOutlineRequest = {
-        client_name: contentPlan?.brand_name,
-        content_plan_guid: contentPlan?.guid,
-        post_title: data['Post Title'] || data?.post_title || postTitle,
-        priority_code: contentPlan?.priorityCode || '',
-        client_domain: contentPlan?.domain_name || contentPlan?.client_domain,
-        inspiration_url_1: contentPlan?.inspiration_url_1,
-        priority1: contentPlan?.inspiration_url_1_priority || undefined,
-        inspiration_url_2: contentPlan?.inspiration_url_2,
-        priority2: contentPlan?.inspiration_url_2_priority || undefined,
-        inspiration_url_3: contentPlan?.inspiration_url_3,
-        priority3: contentPlan?.inspiration_url_3_priority || undefined,
-      };
-
-      getContentPlanOutline(reqObj)
-        .then((res) => {
-          setLoading(false);
-          console.log(res.data)
-          let newData;
-          if (typeof res.data.outline === "string") {
-            newData = JSON.parse(res.data.outline);
-          } else {
-            newData = res.data.outline;
-          }
-          setOutlineGUID(res.data.guid);
-          if (typeof newData === "string") {
-            newData = JSON.parse(newData);
-          }
-          if (newData?.sections) {
-            if (newData.sections.length > 0) {
-              processSections(newData.sections, initial);
-            }
-          }
-        })
-        .catch((err) => {
-          if (data.guid) {
-            fetchOutlineStatus(data.guid)
-              .then(res => {
-                console.log("outline status", res.data)
-                if (res?.data?.outline?.sections?.length > 0) {
-                  processSections(res.data.outline.sections, initial);
-                }
-              })
-          }
-        });
-    }
+        }
+      })
   };
 
   useEffect(() => {
@@ -299,8 +269,9 @@ const CreateContentModal = ({
 
 
   const saveHandler = (click?: boolean) => {
+    setSaving(true)
     if (!loading) {
-      console.log(contentPlan)
+      titleChangeHandler()
       let reqBody: SaveContentPost = {
         post_title: postTitle,
         outline_details: { sections: [...convertToTableData(form.getState)] },
@@ -334,49 +305,37 @@ const CreateContentModal = ({
     saveHandler(true);
   };
 
-  useEffect(() => { console.log(contentPlan, data) }, [data, contentPlan])
 
   const submitWithEmail = (receivingEmail, language?) => {
-
-
     let reqBody: GenerateContentPost = {
-      outline: { sections: [...convertToTableData(form.getState)] },
       email: email,
-      seo_keyword: data.Keyword || data.keyword,
-      content_plan_keyword: contentPlan?.target_keyword || data?.keyword,
       entity_voice: contentPlan?.entity_voice,
-      keyword: postTitle,
-      content_plan_guid: contentPlan.guid,
       content_plan_outline_guid: outlineGUID,
-      client_name: contentPlan.brand_name || contentPlan.client_name,
-      client_domain: contentPlan.domain_name || contentPlan.client_domain,
       receiving_email: receivingEmail,
       writing_language: language || 'English'
     };
 
-    setSubmitted(true);
     return createPost(reqBody)
-      .then((res) => {
-        if (res.data?.uuid) {
-          if (track) { }
 
-          let newObject: QueueItemProps = {
-            type: 'post',
-            domain: contentPlan.domain_name || contentPlan.client_domain,
-            guid: outlineGUID,
-            email,
-            isComplete: false,
-          }
-          supabase
-            .from('user_queues')
-            .insert(newObject)
-            .select("*")
-            .then(res => {
-              console.log(res.data)
-            })
-        }
-        return res
-      })
+  };
+
+  const submitHTMLStylingHandler = (receivingEmail, language?) => {
+    let reqBody: RegeneratePost = {
+      email: email,
+      receiving_email: receivingEmail,
+      content_plan_outline_guid: outlineGUID,
+    };
+
+    return regenerateHTML(reqBody)
+  };
+  const submitGoogleDocRegenerateHandler = (receivingEmail, language?) => {
+    let reqBody: RegeneratePost = {
+      email: email,
+      receiving_email: receivingEmail,
+      content_plan_outline_guid: outlineGUID,
+    };
+
+    return regenerateHTMLfromDoc(reqBody)
   };
 
   const regenerateClickHandler = () => {
@@ -386,8 +345,7 @@ const CreateContentModal = ({
       { email: email, client_domain: contentPlan?.domain_name || contentPlan?.client_domain, client_name: contentPlan?.brand_name || contentPlan?.client_name, post_title: postTitle, content_plan_guid: contentPlan?.guid || data.content_plan_guid }
     )
       .then((result) => {
-        let newData = JSON.parse(result.data.outline);
-        processSections(newData.sections, true);
+        regenerateHandler();
         setLoading(false);
       })
       .catch(() => {
@@ -410,13 +368,13 @@ const CreateContentModal = ({
   return (
     <>
       <Modal.Title title={postTitle} className={styles.header}>
-        <h2 className="modal-title" id="outlineEditorModalLabel">
+        <h2 className="modal-title text-white" id="outlineEditorModalLabel">
           Review/Edit Your Outline
         </h2>
         <button
           className={`${styles.closeButton}
         btn
-        btn-warning`}
+        btn-secondary`}
           data-bs-dismiss="modal"
           aria-label="Close"
           onClick={closeHandler}
@@ -505,8 +463,9 @@ const CreateContentModal = ({
                     </button>
                   </div>
                 </div>
+                <hr />
               </div>
-              <hr />
+
               <Form controller={form}>
                 <div className={styles.contentForm}>
                   {tableData?.length > 0 ? (
@@ -545,7 +504,7 @@ const CreateContentModal = ({
         )}
         <div className={styles.footerButtons}>
           <button
-            className={`${styles.closeButton} btn btn-warning bg-warning text-dark`}
+            className={`${styles.closeButton} btn btn-secondary text-light`}
             data-bs-dismiss="modal"
             aria-label="Close"
             onClick={closeHandler}
@@ -583,7 +542,7 @@ const CreateContentModal = ({
         closeIcon
       >
         <Modal.Title title="Generate Your Post" />
-        <RegeneratePostModal submitHandler={submitWithEmail} onClose={() => setCreatingPost(false)} onSuccess={onClose} type={GenerateTypes.GENERATE} />
+        <RegeneratePostModal title={data?.title} submitGoogleDocRegenerateHandler={submitGoogleDocRegenerateHandler} submitHTMLStylingHandler={submitHTMLStylingHandler} submitHandler={submitWithEmail} onClose={() => setCreatingPost(false)} onSuccess={onClose} type={GenerateTypes.GENERATE} />
       </Modal.Overlay >
     </>
   );

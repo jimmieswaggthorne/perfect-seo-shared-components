@@ -1,14 +1,30 @@
-// brand colors 
-$SEOPerfect: #E63946;
-$contentPerfect: #D14124;
-$preferencesPerfect: #9dc450;
+// Loud SEO Brand Colors 
+$orange: #FF5900;
+$lightOrange: #FEDFCE;
+$grey: #EDEDED;
+$black: #3E3E3E;
+$lightBlue: #CEDFFE;
+$babyBlue: #EFF8FF;
+// $lightGreen: #F8FCDA;
+$lightGreen: #9dc450;
+
+// SEO Branding Colors 
+// $SEOPerfect: #E63946;
+$SEOPerfect: $orange;
+// $contentPerfect: #D14124;
+$contentPerfect: $orange;
+// $preferencesPerfect: #9dc450;
+$preferencesPerfect: $orange;
 $productPerfect: #235789;
 $classifyPerfect: #ffd900;
 $imagePerfect: #EF476F;
 $factcheckPerfect: #179BAE;
 $redirectPerfect: #999948;
-$indexPerfect: #f59f3c;
-$synopsisPerfect: #8b59ad;
+// $indexPerfect: #f59f3c;
+$indexPerfect: $orange;
+$schemaPerfect: #f59f3c;
+$synopsisPerfect: $orange;
+// $synopsisPerfect: #8b59ad;
 $voicePerfect: #6699CC;
 $pagePerfect: #666699;
 $socialPerfect: #CC6699;
@@ -16,8 +32,9 @@ $dark: #212529;
 // f59f3c
 
 // localized colors
-$primary: #E63946 !default;
-$secondary: #333333 !default;
+$primary: $orange !default;
+$secondary: $lightOrange !default;
+$success: $lightGreen !default;
 
 .text-SEOPerfect {
   color: $SEOPerfect !important;
@@ -73,4 +90,28 @@ $secondary: #333333 !default;
 
 .text-socialPerfect {
   color: $socialPerfect !important;
+}
+
+.bg-light-blue {
+  background-color: $lightBlue !important;
+}
+
+.bg-baby-blue {
+  background-color: $babyBlue !important;
+}
+
+.bg-light-yellow {
+  background-color: $lightGreen !important;
+}
+
+.text-light-blue {
+  color: $lightBlue !important;
+}
+
+.text-baby-blue {
+  color: $babyBlue !important;
+}
+
+.text-light-yellow {
+  color: $lightGreen !important;
 }

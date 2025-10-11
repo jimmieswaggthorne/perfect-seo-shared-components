@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import styles from './Reports.module.scss'
 import Table, { TableColumnArrayProps } from '@/perfect-seo-shared-components/components/Table/Table'
-import { deleteContentPlan, getAhrefsDomainRating, getContentPlansByDomain, getContentPlansByEmail, getGSCSearchAnalytics } from '@/perfect-seo-shared-components/services/services'
-import { useRouter } from 'next/navigation'
-import * as Modal from '@/perfect-seo-shared-components/components/Modal/Modal'
+import { getAhrefsDomainRating, getAhrefsUrlRating, getGSCLiveURLReport, getGSCSearchAnalytics, getPostsByDomain, populateBulkGSC } from '@/perfect-seo-shared-components/services/services'
 import moment from 'moment-timezone'
-import useViewport from '@/perfect-seo-shared-components/hooks/useViewport'
 import TypeWriterText from '@/perfect-seo-shared-components/components/TypeWriterText/TypeWriterText'
-import { useDispatch, useSelector } from 'react-redux'
 import usePaginator from '@/perfect-seo-shared-components/hooks/usePaginator'
-import { addToast, selectEmail, selectIsAdmin } from '@/perfect-seo-shared-components/lib/features/User'
 import LoadSpinner from '../LoadSpinner/LoadSpinner'
-import ContentPlanForm from '@/perfect-seo-shared-components/components/ContentPlanForm/ContentPlanForm'
-import { createClient } from '@/perfect-seo-shared-components/utils/supabase/client'
-import { QueueItemProps } from '@/perfect-seo-shared-components/data/types'
 import * as Request from "@/perfect-seo-shared-components/data/requestTypes";
-
+import { useSession } from 'next-auth/react'
 export interface PlanListProps {
   domain_name: string;
   url?: string;
@@ -23,199 +15,293 @@ export interface PlanListProps {
 }
 const Reports = ({ domain_name, active }: PlanListProps) => {
   const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<any>(null)
-  const [GSCData, setGSCData] = useState<any>(null)
-  const { tablet, phone } = useViewport()
-  const [deleteModal, setDeleteModal] = useState(null)
-  const [newModal, setNewModal] = useState(false)
-  const [duplicateInfo, setDuplicateInfo] = useState(null)
-  const supabase = createClient()
-  const email = useSelector(selectEmail)
-  const isAdmin = useSelector(selectIsAdmin)
-  const router = useRouter();
-  const dispatch = useDispatch()
-  const [startDate, setStartDate] = useState(moment().subtract(30, "days").format("YYYY-MM-DD"));
-  const [endDate, setEndDate] = useState(moment().format("YYYY-MM-DD"))
-  const [showDetails, setShowDetails] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [startDate, setStartDate] = useState(moment().subtract(29, "days").format("YYYY-MM-DD"));
+  const [endDate, setEndDate] = useState(moment().subtract(1, "days").format("YYYY-MM-DD"))
   const paginator = usePaginator()
 
-  const domainRatings = useMemo(() => {
-    let ratings = {
-      total: 0, count: 0, average: 0, data: []
+  const [tableData, setTableData] = useState<any[]>([])
+  const [urlData, setUrlData] = useState<any[]>(null)
+  const [summaryData, setSummaryData] = useState<any>(null)
+  const { data: session }: any = useSession()
+  useEffect(() => {
+    if (session?.token) {
+      const token = typeof session?.token === 'string' ? JSON.parse(session.token) : session?.token;
+      populateBulkGSC(token)
     }
 
-    if (data) {
-      console.log(data)
-      ratings.total = data.data.reduce((prev, acc) => prev + acc.domain_rating, 0)
-      ratings.count = data.meta.total_records
-      ratings.average = ratings.total / ratings.count
-      ratings.data = data.data
-      setLoading(false);
-    }
+  }, [active, session?.token])
 
-    return ratings
-  }, [data])
 
-  const fetchPlans = () => {
-    let reqObj: Request.GSCRequest = {
+
+  const fetchInfo = async () => {
+    setLoading(true)
+    setUrlData(null)
+    let gscReqObj: Request.GSCRequest = {
       domain: domain_name,
       start_date: startDate,
-      end_date: endDate
+      end_date: endDate,
     }
-    getGSCSearchAnalytics(reqObj)
+
+    // const ahrefsGlobalData = await getAhrefsDomainRating({ ...gscReqObj, domain: domain_name })
+    // let rating = ahrefsGlobalData.data?.data?.reduce((acc, obj) => acc + obj?.domain_rating || 0, 0)
+    // if (rating > 0) {
+    //   rating = (rating / ahrefsGlobalData?.data?.data.length).toFixed(1)
+    // }
+    // else rating = null
+    // Submitted and indexed
+    try {
+      const postResults = await getPostsByDomain(domain_name, { ...paginator.paginationObj, page: paginator.currentPage, has_live_post_url: true })
+      paginator.setItemCount(postResults.count)
+      const postData = postResults.data
+      setTableData(postData)
+    } catch (error) {
+      // Handle error silently
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchSummaryInfo = async () => {
+    setSummaryData(null)
+    setSummaryLoading(true)
+    getGSCLiveURLReport({
+      domain: domain_name,
+      start_date: startDate,
+      end_date: endDate,
+      limit: 1,
+    })
       .then(res => {
-        setLoading(false);
-        setGSCData(res.data)
+        setSummaryData(res.data.data)
+        setSummaryLoading(false)
       })
-    getAhrefsDomainRating(reqObj)
-      .then(res => {
-        setData(res.data)
+      .catch(err => {
+        setSummaryLoading(false)
       })
+
 
   }
 
-
-  const addToQueue = (obj) => {
-    let newObject: QueueItemProps = {
-      type: 'contentPlan',
-      domain: obj?.domain_name,
-      guid: obj?.guid,
-      email,
-      isComplete: obj?.status === 'Finished' ? true : false,
-    }
-    supabase
-      .from('user_queues')
-      .insert(newObject)
-      .select("*")
-      .then(res => {
-        dispatch(addToast({ title: "Content Plan Added Content to Watchlist", type: "info", content: `${obj?.target_keyword} Content Plan for ${obj?.domain_name} added to Watchlist` }))
-      })
+  const retrievePostsGscInfo = async (data) => {
+    let newGSCData = await Promise.all(data.map(async (obj, i) => {
+      if (i === 0) return obj
+      if (obj?.index_status !== 'Submitted and indexed') {
+        return obj
+      }
+      let reqObj = {
+        start_date: startDate,
+        end_date: endDate,
+        page_url: obj.live_post_url,
+        keyword: false
+      }
+      const { data } = await getGSCSearchAnalytics({ ...reqObj, domain: domain_name })
+      let newData = {
+        ...obj,
+        title: obj.title,
+        total_clicks: data?.data?.length > 0 ? data.data.reduce((prev, curr) => prev + curr?.total_clicks, 0) : 'N/A',
+        total_impressions: data?.data?.length > 0 ? data.data.reduce((prev, curr) => prev + curr?.total_impressions, 0) : 'N/A',
+        avg_ctr_percent: data?.data?.length > 0 ? data.data.reduce((prev, curr) => prev + curr?.avg_ctr_percent, 0) : 'N/A',
+        avg_position: data?.data?.length > 0 ? data.data.reduce((prev, curr) => prev + curr?.avg_position, 0) : 'N/A',
+      }
+      // const ahrefsData = await getAhrefsUrlRating(reqObj)
+      // let ahref_rating: any = ahrefsData.data?.data?.reduce((acc, obj) => acc + obj?.url_rating || 0, 0)
+      // if (ahref_rating > 0) {
+      //   ahref_rating = (ahref_rating / ahrefsData?.data?.data.length).toFixed(1)
+      // }
+      // else {
+      //   ahref_rating = null
+      // }
+      // if (ahref_rating) {
+      //   return { ...newData, ahref_rating }
+      // }
+      // else 
+      return newData
+    }))
+    setUrlData(newGSCData)
   }
 
   useEffect(() => {
+    if (tableData?.length > 1) {
+      retrievePostsGscInfo(tableData)
+    }
+  }, [tableData])
+
+
+  useEffect(() => {
     let interval;
-    if (active && !newModal) {
-      setLoading(true)
-      fetchPlans();
-      interval = setInterval(fetchPlans, 300000)
+    if (active) {
+      fetchInfo();
+      interval = setInterval(fetchInfo, 300000)
     }
 
     return () => {
       clearInterval(interval);
     }
-  }, [domain_name, active, paginator.currentPage, paginator.limit, newModal])
+  }, [domain_name, paginator?.currentPage, paginator?.limit, active])
 
-  const completeStatuses = ["Finished", "Your Content Plan Has Been Created"]
+  useEffect(() => {
+    if (active && domain_name) {
+      fetchSummaryInfo()
+    }
+  }, [domain_name, startDate, endDate, active])
 
+  const renderTotalClicks = (obj, i) => {
+    if (urlData?.length > 0) {
+      let newPost = urlData.find(post => post.title === obj.title)
+      let totalClicks = newPost?.total_clicks >= 0 ? newPost?.total_clicks?.toLocaleString() : null
 
-  const columnArray: TableColumnArrayProps[] = [
-    { id: 'date', Header: 'Date', accessor: (obj) => moment(obj.date + 'Z', "YYYY-MM-DD").format("dddd, MMMM Do, YYYY"), disableSortBy: false },
-    { id: 'domain_rating', Header: 'Rating', accessor: 'domain_rating', headerClassName: 'text-end', cellClassName: 'text-end' },
-  ];
+      return totalClicks
+    }
+    else {
+      return null
+    }
+  }
+  const renderTotalImpression = (obj, i) => {
+    if (urlData?.length > 0) {
+      let newPost = urlData.find(post => post.title === obj.title)
+      let totalImpressions = newPost?.total_impressions >= 0 ? newPost?.total_impressions?.toLocaleString() : null
 
-  const gscColumnArray: TableColumnArrayProps[] = [
-    { id: 'date', Header: 'Date', accessor: (obj) => moment(obj.date + 'Z', "YYYY-MM-DD").format("dddd, MMMM Do, YYYY"), disableSortBy: false },
-    { id: 'domain_rating', Header: 'Rating', accessor: 'domain_rating', headerClassName: 'text-end', cellClassName: 'text-end' },
-  ];
+      return totalImpressions
 
+    }
+    else {
+      return null
+    }
+  }
+  const renderAverageCTR = (obj, i) => {
+    if (urlData?.length > 0) {
+      let newPost = urlData.find(post => post.title === obj.title)
+      let avgCTR = newPost?.avg_ctr_percent >= 0 ? `${newPost?.avg_ctr_percent.toFixed(1)}%` : null
 
-  const deleteHandler = (guid) => {
-    deleteContentPlan(guid)
-      .then(res => {
-        setDeleteModal(null)
-        fetchPlans()
-      })
-      .catch(err => {
-        setDeleteModal(null)
+      return avgCTR
+
+    }
+    else {
+      return <LoadSpinner withBackground={false} />
+    }
+  }
+  const renderAveragePosition = (obj, i) => {
+    if (urlData?.length > 0) {
+      let newPost = urlData.find(post => post.title === obj.title)
+      let totalImpressions = newPost?.avg_position >= 0 ? newPost?.avg_position?.toFixed(3) : null
+
+      return totalImpressions
+
+    }
+    else {
+      return null
+    }
+  }
+
+  const renderTitle = (obj) => (
+    <div className="d-flex flex-column">
+      <p className='mb-0'>{obj.title}</p>
+      {obj.live_post_url && <a href={obj.live_post_url} target="_blank" rel="noreferrer" className='text-primary text-wrap title-max mb-0 pb-0'>...{obj.live_post_url.replace("https://", "").replace("www.", "").replace(obj.client_domain, "")}</a>
       }
-      )
-  }
+    </div>
+  )
 
-  const newCloseHandler = () => {
-    setDuplicateInfo(null)
-    setTimeout(() => fetchPlans(), 60000)
-    return setNewModal(false)
+  const formatKeyToTitle = (key) => {
+    return key.split("_").map(word => {
+      if (['seo', 'url'].includes(word)) {
+        return word.toUpperCase()
+      } else {
+        return word.charAt(0).toUpperCase() + word.slice(1)
+      }
+    }
+    ).join(" ")
   }
+  const gscColumnArray: TableColumnArrayProps[] = [
+    { id: 'title', Header: 'Title', accessor: renderTitle, cellClassName: 'title-max', headerClassName: 'bg-transparent' },
+    { id: 'total_clicks', Header: 'Total Clicks', accessor: renderTotalClicks, headerClassName: 'bg-transparent' },
+    { id: 'total_impressions', Header: 'Total Impressions', accessor: renderTotalImpression, headerClassName: 'bg-transparent' },
+    { id: 'avg_ctr_percent', Header: 'Average CTR', accessor: renderAverageCTR, cellClassName: "relative", headerClassName: 'bg-transparent' },
+    { id: 'avg_position', Header: 'Average Position', accessor: renderAveragePosition, headerClassName: 'bg-transparent' },
+    // { id: 'ahref_rating', Header: 'AHREFs Rating', accessor: 'ahref_rating', headerClassName: 'bg-transparent text-white' },
+  ];
 
-  const detailClickHandler = (e) => {
-    e.preventDefault();
-    setShowDetails(!showDetails)
-  }
+  const summarySections = useMemo(() => {
+    let sections = [];
+    if (summaryData) {
+      sections = Object.keys(summaryData)
+    }
+    return sections
+  }, [summaryData])
+
+
 
   return (
     <div className={styles.wrap}>
       <div className='row g-3 d-flex justify-content-between align-items-end mb-3'>
-        <div className='col col-md-auto d-flex justify-content-center align-items-end'>
-          <h2 className='text-white mb-0'>
-            <TypeWriterText string="Domain Reporting" withBlink />
+        <div className='col-12 d-flex justify-content-between align-items-end'>
+          <h2>
+            <TypeWriterText string="Google Search Console and AHREF Ratings" withBlink />
           </h2>
-          <div>
-            {paginator?.itemCount > 0 && <p className='badge rounded-pill text-bg-primary ms-3 d-flex align-items-center mb-1'>{paginator?.itemCount}</p>}
-          </div>
+          <p className='mb-0'>
+            <span className="text-primary me-2">Dates</span>
+            {moment(startDate).format("M/D/YY")} to {moment(endDate).format("M/D/YY")}</p>
         </div>
       </div>
-      {loading && <LoadSpinner />}
       <div className='row d-flex justify-content-between align-items-start g-3'>
-        <div className='col-12 col-lg-6'>
-          <div className='card p-3'>
-            <div className='row d-flex align-items-end'>
-              <h3 className='col-12'>
-                <span className='text-primary'>AHREFs Domain Rating</span>
-                <span className='ms-2'>{domainRatings?.average?.toFixed(2)}</span>
-              </h3>
-              <div className='col-12 mb-2'>
-                <a
-                  className="text-white" onClick={detailClickHandler}
-                >
-                  {showDetails ?
-                    <i className="bi bi-caret-up-fill me-2" />
-                    : <i className="bi bi-caret-down-fill me-2" />
-                  }
-                  {showDetails ? 'Hide' : 'Show'} Daily Breakdown <i>(Last 30 days)</i></a></div>
-            </div>
-            {showDetails && <div className='col-12 pb-0'>
-              {data?.data?.length > 0 ?
-                <div className='mt-2'>
+        {!domain_name &&
+          <h5><TypeWriterText withBlink string="Please select a domain to view the reports" /></h5>}
+        {summaryData && <div className='col-12 relative'>
+          <h4 className="text-primary mb-3">Summary</h4>
+          {summaryData ?
+            <div className="table-wrap table-responsive card bg-secondary">
+              <table className="table table-responsive">
+                {summarySections?.length > 0 && summarySections.map((obj, i) => {
+                  return (
+                    <>
+                      <thead key={`summary-section-${i}`}>
+                        <tr>
+                          <th colSpan={5} className="text-center">{formatKeyToTitle(obj)}
+                          </th>
+                        </tr>
+                        <tr>
+                          <th className="bg-transparent">Type</th>
+                          <th className="bg-transparent">Clicks</th>
+                          <th className="bg-transparent">Impressions</th>
+                          <th className="bg-transparent">CTR</th>
+                          <th className="bg-transparent">Position</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(summaryData[obj])?.map((data, i) => {
+                          let lineData = summaryData[obj][data]
+                          return (
+                            <tr key={`summary-section-data-${i}`}>
+                              <td>{formatKeyToTitle(data)}</td>
 
-                  <Table rawData={data.data} isLoading={loading} columnArray={columnArray} />
-                  <div className='col-auto d-flex justify-content-center'>
-                    {paginator.renderComponent()}
-                  </div>
-                </div>
-                : domainRatings?.average > 0 ?
-                  <h5><TypeWriterText withBlink string="The are no results for the given parameters" /></h5>
-                  : null}
-            </div>}
-          </div>
-        </div>
-        <div className='col-12 col-lg-6'>
-          <div className='card p-3'>
-            <div className='row d-flex'>
-              <h3 className='text-primary'>Google Search Console </h3>
+                              <td>{lineData?.total_clicks >= 0 ? lineData?.total_clicks?.toLocaleString() : lineData?.clicks_percentage > 0 ? `${lineData.clicks_percentage}%` : null}</td>
+
+                              <td>{lineData?.total_impressions >= 0 ? lineData?.total_impressions?.toLocaleString() : lineData?.impressions_percentage > 0 ? `${lineData?.impressions_percentage}%` : null}</td>
+
+                              <td>{lineData?.avg_ctr_percent >= 0 ? `${lineData?.avg_ctr_percent.toFixed(1)}%` : lineData?.ctr_difference > 0 ? `${lineData?.ctr_difference}%` : null}</td>
+
+                              <td>{lineData?.avg_position >= 0 ? lineData?.avg_position?.toFixed(3) : lineData?.position_difference > 0 ? `${lineData?.position_difference?.toFixed(3)}` : null}</td>
+                            </tr>
+                          )
+                        })
+                        }
+                      </tbody>
+                    </>
+                  )
+                })}
+              </table>
             </div>
-            {GSCData?.data?.length >= 0 && <div className='col-12'>
-              {GSCData?.data?.length > 0 ? <Table rawData={GSCData.data} isLoading={loading} columnArray={gscColumnArray} />
-                : <h5><TypeWriterText withBlink string="The are no results for the given parameters" /></h5>}
-            </div>}
-          </div>
+            : summaryLoading ? <LoadSpinner /> : <h5><TypeWriterText withBlink string="The are no summary results for the given parameters" /></h5>}
+        </div>}
+        {tableData.length >= 0 && <div className='col-12 relative'>
+          <h4 className="text-primary mb-3">By Post</h4>
+          {tableData.length > 0 ?
+            <div className="card bg-secondary"><Table rawData={tableData} columnArray={gscColumnArray} className="relative" /></div>
+            : loading ? <LoadSpinner /> : <h5><TypeWriterText withBlink string="The are no post results for the given parameters" /></h5>}
+        </div>}
+        <div className='col-auto d-flex justify-content-center'>
+          {paginator.renderComponent()}
         </div>
       </div>
-      <Modal.Overlay open={newModal} onClose={newCloseHandler} closeIcon>
-        <Modal.Title title="New Content Plan" />
-        <Modal.Description className={styles.newModal}>
-          <ContentPlanForm initialData={duplicateInfo} buttonLabel="Create Plan" submitResponse={newCloseHandler} isModal />
-        </Modal.Description>
-      </Modal.Overlay>
-      <Modal.Overlay open={deleteModal} onClose={() => { setDeleteModal(null) }}>
-        <Modal.Title title="Delete Plan" />
-        <Modal.Description>
-          Are you sure you want to delete this plan?
-          <div className='d-flex justify-content-between mt-5'>
-            <button onClick={() => { setDeleteModal(null) }} className="btn btn-warning">Cancel</button>
-            <button onClick={(e) => { e.preventDefault(); deleteHandler(deleteModal) }} className="btn btn-primary">Yes</button>
-          </div>
-        </Modal.Description>
-      </Modal.Overlay>
     </div>
   )
 

@@ -1,7 +1,7 @@
 import styles from './OutlineRow.module.scss';
 import TextInput from '@/perfect-seo-shared-components/components/Form/TextInput';
 import classNames from 'classnames';
-import { LegacyRef, useEffect, useState } from 'react';
+import { Ref, useEffect, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 
 export const DragHandle = () => (
@@ -59,9 +59,9 @@ const OutlineRow = ({ rows,
     type: 'row',
   });
 
-  const dropRefType = dropRef as unknown as LegacyRef<HTMLDivElement>;
-  const dragRefType = dragRef as unknown as LegacyRef<HTMLDivElement>;
-  const previewRefType = previewRef as unknown as LegacyRef<HTMLDivElement>;
+  const dropRefType = dropRef as unknown as Ref<HTMLDivElement>;
+  const dragRefType = dragRef as unknown as Ref<HTMLDivElement>;
+  const previewRefType = previewRef as unknown as Ref<HTMLDivElement>;
 
   useEffect(() => {
     setShow(all)
@@ -87,7 +87,7 @@ const OutlineRow = ({ rows,
     });
 
   const accordionClassname = classNames(
-    `${styles.accordionButton}  btn btn-primary`,
+    `${styles.accordionButton}  btn btn-secondary no-outline`,
     { [styles.collapsed]: show }
   )
 
@@ -115,7 +115,7 @@ const OutlineRow = ({ rows,
                 deleteHeadingHandler(index)
               }}
                 disabled={!isAuthorized}
-                className={`${styles.deleteButton} btn btn-warning ms-1`}><i className="bi bi-trash" /></button>
+                className={`${styles.deleteButton} btn btn-primary`}><i className="bi bi-trash" /></button>
               <button className={accordionClassname} onClick={accordionHandler} title={show ? 'Collapse' : 'Expand'}>
                 <span className={styles.dropDownArrow}>
                   {show ?
@@ -185,9 +185,9 @@ const SubheadingRow = ({ headingIndex, index, setSelected, selected, reorderRow,
     }
   }, [isDragging, isOver]);
 
-  const dropRefType = dropRef as unknown as LegacyRef<HTMLDivElement>;
-  const dragRefType = dragRef as unknown as LegacyRef<HTMLDivElement>;
-  const previewRefType = previewRef as unknown as LegacyRef<HTMLDivElement>;
+  const dropRefType = dropRef as unknown as Ref<HTMLDivElement>;
+  const dragRefType = dragRef as unknown as Ref<HTMLDivElement>;
+  const previewRefType = previewRef as unknown as Ref<HTMLDivElement>;
 
   const subRowClasses = classNames(styles.subRow,
     {
@@ -212,7 +212,7 @@ const SubheadingRow = ({ headingIndex, index, setSelected, selected, reorderRow,
             {isAuthorized && <button onClick={(e) => {
               e.preventDefault();
               deleteSubheadingHandler(index)
-            }} className={`${styles.deleteButton} btn btn-warning`}><i className="bi bi-trash" /></button>}
+            }} className={`${styles.deleteButton} btn btn-primary`}><i className="bi bi-trash" /></button>}
           </div>
         </div>
       </div>

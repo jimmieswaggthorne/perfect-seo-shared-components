@@ -1,6 +1,6 @@
 import { Row, flexRender } from '@tanstack/react-table';
 import classNames from 'classnames';
-import { FC, LegacyRef, useEffect } from 'react';
+import { FC, Ref, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 
 
@@ -40,9 +40,9 @@ const DraggableRow: FC<{
     }
   }, [isDragging, isOver]);
 
-  const dropRefType = dropRef as unknown as LegacyRef<HTMLDivElement>;
-  const dragRefType = dragRef as unknown as LegacyRef<HTMLDivElement>;
-  const previewRefType = previewRef as unknown as LegacyRef<HTMLDivElement>;
+  const dropRefType = dropRef as unknown as Ref<HTMLDivElement>;
+  const dragRefType = dragRef as unknown as Ref<HTMLDivElement>;
+  const previewRefType = previewRef as unknown as Ref<HTMLDivElement>;
 
   const rowClasses = classNames('table-drag-row-wrapper',
     {

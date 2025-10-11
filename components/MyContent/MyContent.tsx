@@ -14,14 +14,15 @@ import { createClient } from '@/perfect-seo-shared-components/utils/supabase/cli
 import { urlSanitization } from '@/perfect-seo-shared-components/utils/conversion-utilities';
 import BulkPostComponent from '../BulkPostGenerator/BulkPostComponent';
 import CheckGoogleDomains from '../CheckGoogleDomains/CheckGoogleDomains';
-import { getSynopsisInfo } from '@/perfect-seo-shared-components/services/services';
+import { checkDomainCSSFile, getSynopsisInfo } from '@/perfect-seo-shared-components/services/services';
 import BulkContentComponent from '../BulkContentGenerator/BulkContentComponent';
 import OutlinesList from '../OutlinesList/OutlinesList';
 import BrandHeader from '../BrandHeader/BrandHeader';
 import LoadSpinner from '../LoadSpinner/LoadSpinner';
-import { selectDomains, selectDomainsInfo, selectEmail, selectIsAdmin, selectIsLoading, selectIsLoggedIn, selectSettings, selectUser } from '@/perfect-seo-shared-components/lib/features/User'
+import { selectDomains, selectDomainsInfo, selectEmail, selectIsAdmin, selectIsLoading, selectIsLoggedIn, selectSettings, selectUser, setUserSettings } from '@/perfect-seo-shared-components/lib/features/User'
 import Tooltip from '../Tooltip';
 import Reports from '../Reports/Reports';
+import css from 'styled-jsx/css';
 
 
 export interface MyContentProps {
@@ -59,48 +60,26 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
     if ((currentDomain || domain) && domainsInfo) {
       let checkDomain = currentDomain || domain
       data = domainsInfo.find(obj => obj?.domain === checkDomain)
-      if (!data) {
+      if (data !== null) {
         getSynopsisInfo(checkDomain)
           .then(res => {
-            setSynopsis(res?.data)
+            checkDomainCSSFile(checkDomain)
+            if (res.data) {
+              setSynopsis(res?.data[0])
+            }
+            else {
+              setSynopsis(null)
+
+            }
           })
-          .catch(err => {
-            setSynopsis(null)
-          }
-          )
       }
-      else {
-        setSynopsis(data)
-      }
+    }
+    else {
+      console.log(data)
+      setSynopsis(data)
     }
 
   }, [currentDomain, domainsInfo, domain])
-
-
-  const isDefaultDomain = useMemo(() => {
-    let bool = false;
-    if (settings?.global?.defaultDomain) {
-      if (selected?.value === settings?.global?.defaultDomain) {
-        bool = true
-      }
-    }
-    return bool
-  }, [settings, selected])
-
-  const addDefaultHandler = (e?) => {
-    e?.preventDefault();
-    let global = settings?.global || {}
-    supabase
-      .from('settings')
-      .update({ global: { ...global, defaultDomain: selected?.value } })
-      .eq('email', email)
-      .select("*")
-      .then(res => {
-        if (!res.error) {
-
-        }
-      })
-  }
 
   useEffect(() => {
     if (email && domain && !dataTracked) {
@@ -147,14 +126,20 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
 
 
 
-  const TabData = [
-    { key: "content-plans", title: "Generated Content Plans" },
-    { key: "outlines", title: "Generated Outlines" },
-    { key: "posts", title: "Generated Posts" },
-    { key: "reports", title: "Stats & Reports" },
-    { key: "bulk-content", title: "Bulk Content Plans" },
-    { key: "bulk-posts", title: "Bulk Posts" },
-  ]
+  const TabData = useMemo(() => {
+
+    let tabListStart = [{ key: "content-plans", title: "Content Plans" },
+    { key: "outlines", title: "Outlines" },
+    { key: "posts", title: "Posts" }]
+    let bulkTabs = [
+      { key: "bulk-content", title: "Bulk Content Plans" },
+      { key: "bulk-posts", title: "Bulk Posts" },]
+
+    if (isAdmin && domain) {
+      tabListStart = [...tabListStart, { key: "reports", title: "Reports" }]
+    }
+    return [...tabListStart, ...bulkTabs]
+  }, [isAdmin, domain])
 
   const searchDomainChangeHandler = (e) => {
     if (e) {
@@ -177,9 +162,12 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
     supabase
       .from("domains")
       .select("*")
+      .eq("blocked", false)
+      .eq("hidden", false)
+      .order("domain", { ascending: true })
       .then((res) => {
         if (res.data?.length > 0) {
-          setDomains(res?.data?.sort((a, b) => a?.domain?.localeCompare(b?.domain)));
+          setDomains(res?.data);
         }
 
       });
@@ -220,6 +208,10 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
       });
     }
     if (list?.length > 0) {
+      if (!isAdmin) {
+        setDomain(list[0].value);
+        setSelected(list[0]);
+      }
       list = list.reduce((acc, current) => {
         if (!acc.find(item => item.value === current.value)) {
           return [...acc, current]
@@ -241,14 +233,26 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
         setSelected({ label: currentDomain, value: currentDomain })
         return setLoading(false)
       } else if (domainParam) {
-        setDomain(domainParam)
-        setSelected({ label: domainParam, value: domainParam })
-        return setLoading(false)
-      } else if (settings?.global?.defaultDomain) {
+        if (domainParam.includes("/")) {
+          let newDomainParam = domainParam.replaceAll("/", "");
+          setDomain(newDomainParam)
+          setSelected({ label: newDomainParam, value: newDomainParam })
+          router.replace(pathname + '?' + createQueryString("domain", newDomainParam))
+          return setLoading(false)
+        }
+
+        else {
+          setDomain(domainParam)
+          setSelected({ label: domainParam, value: domainParam })
+          return setLoading(false)
+        }
+      }
+      else if (settings?.global?.defaultDomain) {
         setDomain(settings.global.defaultDomain)
         setSelected({ label: settings.global.defaultDomain, value: settings.global.defaultDomain })
         return setLoading(false)
       }
+
       else {
         return setLoading(false)
       }
@@ -287,6 +291,31 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
     return bool
   }, [currentDomain, selected, domainsList, domain_access, isLoading])
 
+
+  const isDefaultDomain = useMemo(() => {
+    let bool = false;
+    if (settings?.global?.defaultDomain) {
+      console.log(settings?.global?.defaultDomain, selected?.value)
+      if (selected?.value === settings?.global?.defaultDomain) {
+        bool = true
+      }
+    }
+    return bool
+  }, [settings?.global?.defaultDomain, selected])
+
+  const addDefaultHandler = (e?) => {
+    e?.preventDefault();
+    let global = settings?.global || {}
+    supabase
+      .from('settings')
+      .update({ global: { ...global, defaultDomain: selected?.value } })
+      .eq('email', email)
+      .select('*')
+      .then(res => {
+        setUserSettings({ ...settings, global: { ...global, defaultDomain: selected?.value } })
+      })
+
+  }
   useEffect(() => {
     if (isAdmin) {
       fetchDomains();
@@ -324,46 +353,54 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
     <>
       {hideTitle ? null :
         <div className='container-fluid container-xl'>
-          <div className='row px-3 g-3 align-items-center justify-content-between'>
-            {(synopsis && ['bulk-content', 'bulk-posts'].includes(selectedTab) === false) ?
-              <>
-                <BrandHeader synopsis={synopsis} />
-              </> :
-              <div className='col'>
-                <h1 className="text-start mb-5"><TypeWriterText string={selectedTab.includes("bulk") ? 'Upload for all domains' : selected ? `Content for ${domain}` : 'Your Content'} withBlink /></h1>
-              </div>
-            }
-            {(domainsList?.length > 0 && ['bulk-content', 'bulk-posts'].includes(selectedTab) === false && !currentDomain) && <div className='col-12 col-md-8 col-lg-4 mb-5 d-flex align-items-center'>
-              <div className='row d-flex align-items-center g-2'>
+          <div className='card p-3 bg-secondary my-3'>
+            <div className='row g-3 align-items-center justify-content-between'>
+              {(synopsis && ['bulk-content', 'bulk-posts'].includes(selectedTab) === false) ?
+                <>
+                  <BrandHeader synopsis={synopsis} />
+                </> :
                 <div className='col'>
-                  <SearchSelect
-                    onChange={searchDomainChangeHandler}
-                    options={domainsList}
-                    isLoading={!domainsList}
-                    value={selected || null}
-                    placeholder="Select a Domain"
-                    bottomSpacing={false}
-                  />
+                  <h1 className="text-start mb-0 text-primary"><TypeWriterText string={selectedTab.includes("bulk") ? 'Upload for all domains' : selected ? `Content for ${domain}` : 'Your Content'} withBlink /></h1>
                 </div>
-                <div className="col-auto">
-                  <Tooltip>
-                    Clear search field to see all content by email
-                  </Tooltip>
+              }
+              {(domainsList?.length > 0 && ['bulk-content', 'bulk-posts'].includes(selectedTab) === false && !currentDomain) &&
+                <div className='col-12 d-flex align-items-center'>
+                  <div className='bg-primary card p-3'>
+                    <div className='row d-flex align-items-end g-2 min-350'>
+                      <div className='col'>
+                        <div className='formField'>
+                          <label className='formField-label text-white'>Select a Domain or clear input for content by email address</label>
+                          <SearchSelect
+                            onChange={searchDomainChangeHandler}
+                            options={domainsList}
+                            isLoading={!domainsList}
+                            value={selected || null}
+                            placeholder="Select a Domain"
+                            bottomSpacing={false}
+                            className='w-100'
+                          />
+                        </div>
+                      </div>
+                      <div className="col-auto mb-2">
+                        <Tooltip>
+                          Clear search field to see all content by email
+                        </Tooltip>
+                      </div>
+                      {(!isDefaultDomain && selected) && <div className='col-auto'>
+                        <a className='text-white' onClick={addDefaultHandler}>Make Default</a>
+                      </div>}
+                    </div>
+                  </div>
                 </div>
-
-                {(!isDefaultDomain && selected) && <div className='col-auto'>
-                  <a className='text-primary' onClick={addDefaultHandler}>Make Default</a>
-                </div>}
-              </div>
+              }
             </div>
-            }
-          </div >
-        </div >
+          </div>
+        </div>
       }
-      <div className='container-xl content-fluid'>
-        {isLoading && <LoadSpinner />}
+      <div className='container-xl content-fluid rc relative'>
+        {/* {isLoading && <LoadSpinner />} */}
         <div className={styles.tabWrap}>
-          <ul className="nav nav-tabs mb-0">
+          <ul className="nav nav-tabs mb-0 w-100">
             {TabData.map((tab) => {
 
               const tabClasses = classNames('nav-link',
@@ -376,7 +413,7 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
               )
             })}
           </ul>
-          <div className="tab-content bg-dark mb-3" id="myTabContent">
+          <div className="tab-content  mb-3" id="myTabContent">
             <div className={`tab-pane fade ${selectedTab === 'outlines' && 'show active'}`} id="outlines" role="tabpanel" aria-labelledby="outlines-tab">
               <div className='tab p-3'>
                 <Suspense fallback={<LoadSpinner />}>
@@ -393,7 +430,7 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
             </div>
             <div className={`tab-pane fade ${selectedTab === 'content-plans' && 'show active'}`} id="content-plans" role="tabpanel" aria-labelledby="content-plans-tab">
               <div className='tab p-3'>
-                <Suspense fallback={<LoadSpinner />}>
+                <Suspense fallback={<h1>fallback</h1>}>
                   <PlansList active={!loading && selectedTab === 'content-plans'} domain_name={currentDomain || domain} />
                 </Suspense>
               </div>
@@ -429,4 +466,4 @@ const MyContent = ({ currentDomain, hideTitle = false }: MyContentProps) => {
   )
 }
 
-export default MyContent
+export default MyContent 

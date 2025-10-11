@@ -85,7 +85,6 @@ const useLogoCheck = (logoUrl: string, domain: string, form?: FormController, sy
         setData(newData);
       };
       img.onerror = (e) => {
-        console.log(e)
         setData(blankData);
       };
       // }

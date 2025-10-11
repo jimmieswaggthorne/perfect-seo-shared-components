@@ -9,6 +9,7 @@ interface FormFieldProps {
   withCheckbox?: boolean;
   className?: string;
   bottomSpacing?: boolean;
+  hint?: string
 }
 
 const FormField = ({
@@ -19,6 +20,7 @@ const FormField = ({
   withCheckbox,
   className,
   bottomSpacing = true,
+  hint
 }: FormFieldProps) => {
   const formFieldClasses = classNames('formField', {
     'formField_withCheckbox': withCheckbox,
@@ -29,6 +31,7 @@ const FormField = ({
   const labelNode = label ? (
     <label className="formField-label" htmlFor={fieldName} key={`${fieldName}-label`}>
       {label}
+      {hint && <p className="formField-hint text-wrap">{hint}</p>}
     </label>
   ) : null;
 

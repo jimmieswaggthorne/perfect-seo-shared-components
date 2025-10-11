@@ -1,0 +1,72 @@
+@use "common" as *;
+
+.cssEditor {
+  &-container {
+    border: 1px solid $lightOrange;
+    border-radius: 0.25rem;
+    position: relative;
+    overflow: hidden;
+
+    &.cssEditor-container_withError {
+      border-color: red !important;
+    }
+
+    &.cssEditor-container_readOnly {
+      background-color: transparent !important;
+      border: 1px solid transparent;
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: none !important;
+      }
+    }
+
+    // Monaco Editor styling
+    .monaco-editor {
+      .monaco-editor-background {
+        background-color: var(--bs-body-bg) !important;
+      }
+
+      .monaco-editor,
+      .monaco-editor-background,
+      .monaco-editor .margin {
+        background-color: var(--bs-body-bg) !important;
+      }
+    }
+  }
+
+  &-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.25rem;
+    align-items: center;
+
+    .btn {
+      white-space: nowrap;
+      font-size: 0.875rem;
+    }
+  }
+
+  &-labelContainer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+
+    .formField-label {
+      margin-bottom: 0;
+    }
+
+    .formField-hint {
+      margin-top: 0.25rem;
+      margin-bottom: 0;
+      font-size: 0.875rem;
+      color: var(--bs-secondary);
+    }
+  }
+}
+
+// Hide file input
+.cssEditor-fileInput {
+  display: none !important;
+}

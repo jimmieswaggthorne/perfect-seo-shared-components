@@ -21,7 +21,7 @@
     background-position: 50% 50%;
     background-repeat: no-repeat;
     border: 0;
-    color: white;
+    color: $primary;
     border-radius: 50%;
     font-size: 18px;
     font-weight: bold;
@@ -40,12 +40,12 @@
     &:hover,
     &:focus {
       background-color: transparent;
-      color: $primary;
+      color: $lightOrange;
     }
   }
 
   &-content {
-    background-color: $secondary;
+    background-color: var(--bs-body-bg);
     box-sizing: border-box;
     height: auto;
     max-height: calc(100vh - $bottom-gap - $top-gap - 32px);

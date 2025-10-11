@@ -9,3 +9,11 @@
 @mixin font-digital {
   font-family: 'VT323', monospace;
 }
+
+@mixin font-loud {
+  font-family: 'Instrument Serif', serif;
+}
+
+@mixin font-regular {
+  font-family: 'Noto Sans', sans-serif;
+}

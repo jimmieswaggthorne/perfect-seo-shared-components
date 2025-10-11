@@ -1,5 +1,4 @@
 @use 'common' as *;
-@use 'common' as *;
 
 .table {
 
@@ -11,10 +10,12 @@
   margin-bottom: 2em;
   border-collapse: collapse;
   box-sizing: border-box;
+  border-radius: .375rem;
   display: table;
   width: 100%;
-
+  overflow: hidden;
   @include font-size-small;
+
 
   &-wrap {
     border-radius: 8px;
@@ -35,6 +36,7 @@
           opacity: .7;
         }
       }
+
     }
 
     tbody {
@@ -71,11 +73,11 @@
     }
 
     thead {
-      border-bottom: 1px solid $secondary;
-      border-color: $secondary;
+      border-bottom: 1px solid $orange;
+      border-color: $orange;
       display: table-header-group;
-      color: black;
-
+      background-color: $lightOrange;
+      color: $orange;
     }
 
     tfoot {
@@ -98,8 +100,8 @@
       font-weight: 600 !important;
       padding: 4px 16px;
       text-align: left;
-      background-color: $primary;
-      color: black;
+      background-color: $lightOrange;
+      color: $orange;
 
       &.header-align- {
         &start {
@@ -120,29 +122,29 @@
         position: relative;
 
 
-        &::after {
-          content: '';
+        &::before {
+          content: '▾';
           display: inline-block;
-          height: 4px;
-          margin-left: 5px;
+          height: inherit;
+          left: 4px;
           opacity: 0;
           position: absolute;
-          top: calc(50% - 2px);
+          top: 4px;
           transition: all 0.2s;
-          width: 8px;
+          width: 4px;
         }
 
-        &:hover::after {
+        &:hover::before {
           opacity: .8;
         }
 
-        &.asc::after {
+        &.asc::before {
           opacity: 1;
         }
 
-        &.desc::after {
+        &.desc::before {
           opacity: 1;
-          rotate: 180deg;
+          content: '▴';
         }
       }
     }

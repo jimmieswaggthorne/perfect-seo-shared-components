@@ -1,29 +1,33 @@
 @use 'common' as *;
 
 .react-select {
-  color: white;
+  color: $black;
   flex: 1 0 0;
   width: 100%;
 
   .select {
     &__control {
-      background-color: $dark;
       font-size: 1rem;
       font-weight: 400;
       line-height: 1.5;
-      color: var(--bs-body-color);
+      // color: var(--bs-body-color);
       -webkit-appearance: none;
       -moz-appearance: none;
       appearance: none;
-      background-color: var(--bs-body-bg);
+      // background-color: var(--bs-body-bg);
       background-clip: padding-box;
-      border: var(--bs-border-width) solid var(--bs-border-color);
+      border: var(--bs-border-width) solid $lightOrange;
       border-radius: var(--bs-border-radius);
       transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+      &:hover,
+      &:active,
+      &:focus {
+        border-color: $orange;
+      }
     }
 
     &__menu {
-      background-color: $dark;
       z-index: 1000;
 
       &-list {
@@ -32,32 +36,24 @@
     }
 
     &__option {
-      color: white;
+      &:focus {
+        background-color: $lightOrange;
+
+      }
 
       &--is-focused {
-        background-color: rgba($primary, .5);
+        background-color: $lightOrange;
       }
     }
 
-    &__input {
-      color: white;
-
-      &-container {
-        color: white;
-      }
-    }
 
     &__multi-value {
       background-color: $primary;
 
-      &__label {
-        color: white;
-      }
+
     }
 
-    &__single-value {
-      color: white;
-    }
+
   }
 
 

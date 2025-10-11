@@ -17,6 +17,7 @@ interface TextInputProps extends React.HTMLProps<HTMLInputElement> {
   bottomSpacing?: boolean
   button?: any;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  hint?: string;
 }
 
 const TextInput = ({
@@ -25,6 +26,7 @@ const TextInput = ({
   error,
   icon,
   label,
+  hint,
   fieldName,
   required,
   type = 'text',
@@ -70,14 +72,14 @@ const TextInput = ({
   }
 
   return (
-    <FormField fieldName={fieldName} label={label} bottomSpacing={bottomSpacing}>
+    <FormField hint={hint} fieldName={fieldName} label={label} bottomSpacing={bottomSpacing}>
       <div className="textInput-container">
         <input
           type={type}
           {...props}
           {...ariaProps}
           autoFocus={autoFocus}
-          value={props.value || form.getState[fieldName] || ''}
+          value={type === 'file' ? '' : props.value || form.getState[fieldName] || ''}
           onChange={onChange}
           onPaste={onPaste}
           onKeyDown={props.onKeyDown}
@@ -94,7 +96,7 @@ const TextInput = ({
           </div>
         )}
       </div>
-      {(type === 'url' && (props.value || form.getState[fieldName])) &&
+      {(type === 'url' && (props.value || form.getState[fieldName]) && !(props.value || form.getState[fieldName]).startsWith('.')) &&
         <a className='pt-5 text-primary' href={props.value || form.getState[fieldName]} target="_blank"><small>{props.value || form.getState[fieldName]}</small></a>
       }
       {hasErrors && !hideErrorMessage ? (

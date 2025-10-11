@@ -280,8 +280,8 @@ const BulkPostComponent = ({ active, currentDomain }: BulkPostComponentProps) =>
               <span>No bulk posts were found</span>
             </div>
         }
-      </div >
-    </div >
+      </div>
+    </div>
   );
 };
 

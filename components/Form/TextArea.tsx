@@ -3,6 +3,7 @@ import FieldErrors from './FieldErrors';
 import FormField from './FormField';
 import useFormInput from '@/perfect-seo-shared-components/hooks/useFormInput';
 import { Validator } from '@/perfect-seo-shared-components/utils/validators';
+import { useEffect } from 'react';
 
 interface TextAreaInputProps extends React.HTMLProps<HTMLTextAreaElement> {
   fieldName: string;
@@ -15,6 +16,7 @@ interface TextAreaInputProps extends React.HTMLProps<HTMLTextAreaElement> {
   hideErrorMessage?: boolean;
   bottomSpacing?: boolean;
   button?: any;
+  hint?: string
 }
 
 const TextArea = ({
@@ -22,9 +24,11 @@ const TextArea = ({
   label,
   fieldName,
   required = false,
+  hint,
   validator,
   bottomSpacing,
   type = "text",
+  value,
   className,
   ...props
 }: TextAreaInputProps) => {
@@ -36,6 +40,8 @@ const TextArea = ({
   });
 
   const inputClass = 'textArea-input';
+
+
 
   const inputClassNames = classNames(`${inputClass} form-control`, {
     [`${inputClass}_withError`]: hasErrors,
@@ -53,16 +59,18 @@ const TextArea = ({
   function onChange(e) {
     e.preventDefault()
     form.handleInputChange(e);
-    props.onChange?.(e);
+    if (props.onChange) {
+      props.onChange?.(e);
+    }
   }
 
   return (
-    <FormField fieldName={fieldName} label={label} bottomSpacing={bottomSpacing}>
+    <FormField hint={hint} fieldName={fieldName} label={label} bottomSpacing={bottomSpacing}>
       <div className="textArea-container">
         <textarea
           {...props}
           {...ariaProps}
-          value={props.value ?? form.getState[fieldName]}
+          value={form.getState[fieldName] || value}
           onChange={onChange}
           className={inputClassNames}
           name={fieldName}

@@ -45,14 +45,14 @@ export const Select = ({
   // when a valid option is selected, allowing a visually
   // differentiated placeholder state.
   const value = useMemo(() => {
-    if (props.value) {
+    if (!!props.value) {
       return props.value;
     } else if (form.getState[fieldName]) {
       return form.getState[fieldName];
     } else {
       return '';
     }
-  }, [props.value, form.getState[fieldName]]);
+  }, [props?.value, form.getState[fieldName]]);
 
   const [selectedValue, setSelectedValue] = useState(value);
 

@@ -249,8 +249,8 @@ const BulkContentComponent = ({ active, currentDomain }: BulkContentComponentPro
               <span>No bulk posts were found</span>
             </div>
         }
-      </div >
-    </div >
+      </div>
+    </div>
   );
 };
 

@@ -32,11 +32,11 @@ export const trimSynopsis = (synopsis: any) => {
   let newData: any = Object.keys(synopsis).reduce((prev, key) => {
     if (emptyKeys.includes(key) && synopsis[key] === emptyObject[key]) {
       return prev
-    } if (synopsis[key] === false) {
-      return { ...prev, [key]: false }
     }
     else {
+
       return { ...prev, [key]: synopsis[key] }
+
     }
   }, {})
   return newData
@@ -54,6 +54,9 @@ export const findUniqueKeys = (newObj, oldObj) => {
       return ({ ...prev, [curr]: newObj[curr] })
     } else if (newObj[curr] === false) {
       return ({ ...prev, [curr]: false })
+    }
+    else if (!oldObj[curr]) {
+      return ({ ...prev, [curr]: newObj[curr] })
     }
     else {
       return prev
@@ -120,4 +123,43 @@ export const convertIncomingToFormData = (data: ContentIncomingProps) => {
 
 export function text2Binary(text) {
   return text.split('').map((char) => char.charCodeAt(0).toString(2)).join(' ');
+}
+
+export function keyToLabel(text: string, capAll?: boolean) {
+  let newText = '';
+  if (capAll) {
+    newText = text.split("_").map((word) => {
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    }).join(" ")
+  }
+  else {
+    newText = text.replaceAll("_", " ")
+  }
+  return newText
+
+}
+
+
+export const mapObject = (obj, exclude_keys?) => {
+  let newObject = obj;
+  if (exclude_keys) {
+    newObject = Object.keys(obj).reduce((acc, key) => {
+      if (!exclude_keys.includes(key)) {
+        acc[key] = obj[key];
+      }
+      return acc;
+    }, {})
+  }
+
+  if (typeof newObject !== 'object' || newObject === null) {
+    return 'Input is not an object';
+  }
+  else if (Array.isArray(newObject)) {
+    return 'Input is an array';
+  }
+  else {
+    return Object.keys(newObject).map((key) => {
+      return `${key}: ${newObject[key]}`;
+    }).join('---');
+  }
 }

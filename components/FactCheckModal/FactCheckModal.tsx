@@ -15,11 +15,10 @@ import axios from 'axios';
 
 interface FactCheckModalProps {
   post: PostProps,
-  refresh: () => void
   setLocalPost: (post: PostProps) => void
   onClose: () => void
 }
-const FactCheckModal = ({ post, refresh, setLocalPost, onClose }: FactCheckModalProps) => {
+const FactCheckModal = ({ post, setLocalPost, onClose }: FactCheckModalProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [url, setUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -107,9 +106,9 @@ const FactCheckModal = ({ post, refresh, setLocalPost, onClose }: FactCheckModal
           <p className="text-center">What source would you like to use to run your factcheck?</p>
           <Tabs.Root defaultValue="url" className="w-100">
             <Tabs.List className='d-flex align-items-center justify-content-center px-0'>
-              <Tabs.Trigger className="col-auto pe-4 btn btn-warning btn-tab" value="url">Live Post URL</Tabs.Trigger>
+              <Tabs.Trigger className="col-auto pe-4 btn btn-secondary btn-tab" value="url">Live Post URL</Tabs.Trigger>
               <div className='or-overlap'>OR</div>
-              <Tabs.Trigger className='col-auto ps-4 btn btn-warning btn-tab' value="file" disabled={!post?.html_link}>Generated HTML</Tabs.Trigger>
+              <Tabs.Trigger className='col-auto ps-4 btn btn-secondary btn-tab' value="file" disabled={!post?.html_link}>Generated HTML</Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="url">
               <div className="input-group w-100 mt-3">
@@ -119,7 +118,7 @@ const FactCheckModal = ({ post, refresh, setLocalPost, onClose }: FactCheckModal
                   name='url'
                   onChange={(e) => setUrl(e.target.value)}
                   type="url"
-                  className='form-control bg-dark'
+                  className='form-control bg-light'
                 />{isSameURL ?
                   <button className="btn btn-primary input-group-append" onClick={() => handleUrlCheck()} disabled={isLoading}>
                     {isLoading ? <div className='spinner-border spinner-border-sm' /> : 'Check'}

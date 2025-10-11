@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import classNames from "classnames";
 import Form from "@/perfect-seo-shared-components/components/Form/Form";
@@ -7,22 +7,15 @@ import TextInput from "@/perfect-seo-shared-components/components/Form/TextInput
 import * as Select from "@/perfect-seo-shared-components/components/Form/Select";
 import SearchSelect from "@/perfect-seo-shared-components/components/SearchSelect/SearchSelect";
 import { domainValidator, emailValidator } from "@/perfect-seo-shared-components/utils/validators";
-import { addIncomingPlanItem } from "@/perfect-seo-shared-components/services/services";
+import { addIncomingPlanItem, getSynopsisInfo } from "@/perfect-seo-shared-components/services/services";
 import { convertFormDataToOutgoing, urlSanitization } from "@/perfect-seo-shared-components/utils/conversion-utilities";
 import useForm from "@/perfect-seo-shared-components/hooks/useForm";
 import { createClient } from "@/perfect-seo-shared-components/utils/supabase/client";
-import { selectEmail, selectIsLoggedIn } from "@/perfect-seo-shared-components/lib/features/User";
+import { selectDomains, selectEmail, selectIsAdmin, selectIsLoggedIn } from "@/perfect-seo-shared-components/lib/features/User";
 import { ContentRequestFormProps } from "@/perfect-seo-shared-components/data/types";
 import styles from "./ContentPlanForm.module.scss";
 
-// Testing Data 
-const testSampleData: ContentRequestFormProps = {
-  email: "jimmie@loud.us",
-  domainName: "https://loud.us/",
-  brandName: "Loud Interactive",
-  targetKeyword: "seo",
-};
-
+// 2. Constants and Options
 const blankFormData: ContentRequestFormProps = {
   email: "",
   domainName: "",
@@ -36,6 +29,11 @@ const blankForm: Partial<ContentRequestFormProps> = {
   priority3: "high",
 };
 
+const languageOptions = [
+  "English", "Arabic", "Bengali", "Bulgarian", "Chinese (Simplified)", "Chinese (Traditional)", "Czech", "Danish", "Dutch", "English", "Finnish", "French", "German", "Greek", "Hebrew", "Hindi", "Hungarian", "Indonesian", "Italian", "Japanese", "Korean", "Malay", "Norwegian", "Polish", "Portuguese", "Romanian", "Russian", "Slovak", "Spanish", "Swedish", "Thai", "Turkish", "Ukrainian", "Urdu", "Vietnamese"
+].map((language) => ({ label: language, value: language }))
+
+// 3. Types/Interfaces
 interface ContentPlanFormProps {
   buttonLabel: string,
   initialData?: ContentRequestFormProps
@@ -43,59 +41,27 @@ interface ContentPlanFormProps {
   isModal?: boolean
 }
 
+// 4. Main Component
 const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: ContentPlanFormProps) => {
-  // Redux Selectors 
+  // Redux Selectors
   const isLoggedIn = useSelector(selectIsLoggedIn);
   const email = useSelector(selectEmail);
+  const isAdmin = useSelector(selectIsAdmin);
+  const domain_access = useSelector(selectDomains);
 
-  // State hooks 
+  // State Hooks
   const [selected, setSelected] = useState({ label: 'English', value: 'English' });
+  const [domainSelected, setDomainSelected] = useState(null);
   const [load, setLoad] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [domains, setDomains] = useState([]);
 
+  // Hooks
   const form = useForm();
-
   const supabase = createClient();
 
-  const languageOptions = [
-    "English",
-    "Arabic",
-    "Bengali",
-    "Bulgarian",
-    "Chinese (Simplified)",
-    "Chinese (Traditional)",
-    "Czech",
-    "Danish",
-    "Dutch",
-    "English",
-    "Finnish",
-    "French",
-    "German",
-    "Greek",
-    "Hebrew",
-    "Hindi",
-    "Hungarian",
-    "Indonesian",
-    "Italian",
-    "Japanese",
-    "Korean",
-    "Malay",
-    "Norwegian",
-    "Polish",
-    "Portuguese",
-    "Romanian",
-    "Russian",
-    "Slovak",
-    "Spanish",
-    "Swedish",
-    "Thai",
-    "Turkish",
-    "Ukrainian",
-    "Urdu",
-    "Vietnamese"
-  ].map((language) => ({ label: language, value: language }))
-
-  // Check if domain is in the database
+  // 5. Handlers
   const checkDomain = (domain) => {
     supabase
       .from('domains')
@@ -116,7 +82,6 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
       })
   }
 
-  // Click Handler
   const clickHandler = (e) => {
     setLoad(true);
     e.preventDefault();
@@ -129,13 +94,11 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
         .from('user_history')
         .insert({ email: email, domain: form?.getState?.domainName, transaction_data: form.getState, product: 'contentPerfect', type: "CREATE", action: "Create Plan" })
         .select('*')
-        .then(res => {
-
-        })
+        .then(res => { })
       addIncomingPlanItem(
         convertFormDataToOutgoing(form.getState as ContentRequestFormProps),
       )
-        .then((res) => {
+        .then(async (res) => {
           if (res.data.guid) {
             setLoad(false);
             submitResponse(res.data.guid);
@@ -145,40 +108,15 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
           console.log(err);
           setLoad(false);
         });
-    }
-    else {
+    } else {
       setLoad(false);
     }
   };
-
-  const buttonClasses = classNames("btn btn-warning", {
-    "btn-secondary": load,
-  });
 
   const clickAdvancedHandler = (e) => {
     e.preventDefault();
     setShowAdvanced((showing) => !showing);
   };
-
-
-
-  useEffect(() => {
-    let formState = blankForm;
-
-    if (email) {
-      formState.email = email
-    }
-
-    form.setState(formState);
-  }, [email])
-
-  useEffect(() => {
-    if (initialData) {
-      form.setState(initialData)
-    }
-  }, [initialData])
-
-
 
   const languageChangeHandler = (e) => {
     setSelected(e);
@@ -187,6 +125,103 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
     form.setState(formState)
   }
 
+  const searchButton = () => {
+    const clickHandler = (e) => {
+      e.preventDefault();
+      setShowSearch(true)
+    }
+    return (
+      <button className="btn-primary" onClick={clickHandler}>
+        <i className="bi bi-search text-primary" />
+      </button>
+    )
+  }
+
+  const fetchDomains = () => {
+    supabase
+      .from("domains")
+      .select("*")
+      .then((res) => {
+        if (res.data?.length > 0) {
+          setDomains(res?.data?.sort((a, b) => a?.domain?.localeCompare(b?.domain)));
+        }
+      });
+  };
+
+  const searchDomainChangeHandler = (e) => {
+    setDomainSelected(e)
+    if (e) {
+      supabase
+        .from('pairs') // Replace with your actual table name
+        .select('value')
+        .eq('key', 'brand_name')
+        .eq('domain', e.value)
+        .order('last_updated', { ascending: false })
+        .then(res => {
+          form.setState({ ...form.getState, brandName: res.data[0].value, domainName: e.value })
+        })
+    }
+
+  };
+
+  // 6. Effects
+  useEffect(() => {
+    let formState = blankForm;
+    if (email) {
+      formState.email = email
+    }
+    form.setState(formState);
+  }, [email])
+
+  useEffect(() => {
+    if (initialData) {
+      if (!initialData?.brandName) {
+        getSynopsisInfo(initialData?.domainName)
+          .then((res) => {
+            if (res.data) {
+              let data: any = res.data[0]
+              form.setState({ ...initialData, brandName: data?.brand_name })
+            }
+          })
+      } else {
+        form.setState(initialData)
+      }
+    }
+  }, [initialData])
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchDomains();
+    }
+  }, [isAdmin])
+
+  // 7. Memoized Values
+  const domainsList = useMemo(() => {
+    let list: any = []
+    if (isAdmin) {
+      list = [...list, ...domains?.sort((a, b) => a.domain.localeCompare(b.domain)).map(({ domain }) => ({ label: domain, value: domain }))
+      ]
+    } else if (domain_access?.length > 0) {
+      list = [...list, ...domain_access.map((domain) => {
+        return domain?.siteUrl?.toLowerCase()
+      })].sort((a, b) => a?.localeCompare(b)).map((domain) => {
+        checkDomain(domain)
+        return ({ label: domain, value: domain })
+      });
+    }
+    if (list?.length > 0) {
+      list = list.reduce((acc, current) => {
+        if (!acc.find(item => item.value === current.value)) {
+          return [...acc, current]
+        } else {
+          return acc
+        }
+      }, [])
+    }
+    return list
+  }, [domain_access, domains, isAdmin])
+
+  // 8. Render
   return (
     <div className="w-100">
       <Form controller={form}>
@@ -207,7 +242,24 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
                 Which website is this going on?
               </span>
             </label>
-            <TextInput validator={domainValidator} fieldName="domainName" required />
+            {showSearch ?
+              <div className="d-flex align-items-center">
+                <SearchSelect
+                  onChange={searchDomainChangeHandler}
+                  options={domainsList}
+                  isLoading={!domainsList}
+                  value={domainSelected || null}
+                  placeholder="Select a Domain"
+                  bottomSpacing={false}
+                  fieldName="domainName"
+                  className='w-100 mt-1'
+                />
+                <button className="btn btn-secondary h-100" title="Close Search" onClick={() => setShowSearch(false)}>
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
+              : <TextInput validator={domainValidator} fieldName="domainName" required button={searchButton()} />}
+
           </div>
           <div className="form-group col-12 col-md-6">
             <label htmlFor="brandName">
@@ -221,7 +273,7 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
           <div className="form-group col-12 col-md-6">
             <label htmlFor="targetKeyword">
               <div>
-                Keyword <i className="text-warning">*</i>
+                Keyword <i className="text-primary">*</i>
               </div>
               <span className={styles.subLabel}>What’s the topic?</span>
             </label>
@@ -311,7 +363,9 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
           <div>
             <button
               id="startButton"
-              className={buttonClasses}
+              className={classNames("btn btn-primary", {
+                "btn-secondary": load,
+              })}
               disabled={load}
               onClick={clickHandler}
               type="submit"
@@ -320,7 +374,7 @@ const ContentPlanForm = ({ buttonLabel, initialData, submitResponse, isModal }: 
             </button>
           </div>
           {isModal &&
-            <p className="mt-3 text-warning"><small>*Please note it may take up to 5 minutes for your new plan to appear on you plans list.</small></p>}
+            <p className="mt-3 text-dark"><small>*Please note it may take up to 5 minutes for your new plan to appear on you plans list.</small></p>}
         </div>
       </Form>
     </div>

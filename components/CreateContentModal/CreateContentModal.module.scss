@@ -9,16 +9,6 @@
     min-width: 100vw;
     padding: 8px;
   }
-
-  &Wrap {
-    :global {
-      .modal-description {
-        @include TabletDown {
-          padding: 0;
-        }
-      }
-    }
-  }
 }
 
 .content {
@@ -27,7 +17,6 @@
   position: relative;
 
   &Form {
-    padding: 8px;
     display: flex;
     flex-direction: column;
 
@@ -39,9 +28,9 @@
 
 .warning {
   display: flex;
-  background-color: red;
+  background-color: white;
   font-weight: bolder;
-  color: white;
+  color: $orange;
   padding: 8px;
   align-items: center;
   justify-content: center;
@@ -64,8 +53,8 @@
   position: sticky;
   bottom: $bottom-gap;
   left: 0;
-  background-color: $secondary;
-  border-top: 4px solid black;
+  background-color: $primary;
+  border-top: 2px solid $lightOrange;
   width: 100%;
   display: flex;
   padding: 0;

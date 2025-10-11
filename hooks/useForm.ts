@@ -58,11 +58,13 @@ export interface FormController {
  *    ...
  *  </Form>
  */
-export default function useForm(): FormController {
+
+
+export default function useForm(initialData?: FormState): FormController {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string[]>>({});
-  const [formState, setFormState] = useState<FormState>({});
+  const [formState, setFormState] = useState<FormState>(initialData || {});
   const [initialState, setInitialState] = useState<FormState>({});
   const [changed, setChanged] = useState(false);
   const { current: fieldConfigs } = useRef<Record<string, FieldConfig>>({});

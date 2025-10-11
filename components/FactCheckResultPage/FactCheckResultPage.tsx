@@ -225,7 +225,6 @@ const FactCheckResultPage: FC<FactCheckResultPageProps> = ({ uuid, isModal }: Fa
 
   const loginWithGoogleHandler = (e) => {
     e?.preventDefault();
-    dispatch(setLoading(true))
 
     signIn('google', { callbackUrl: `${window.location.href}/` })
 
@@ -234,7 +233,7 @@ const FactCheckResultPage: FC<FactCheckResultPageProps> = ({ uuid, isModal }: Fa
   if (!status) return <div className='bg-primary'><div className='container strip-padding d-flex justify-content-center align-items-center'><h1 className='text-white text-center'><TypeWriterText withBlink string="Loading" /></h1></div>
   </div>
   return (
-    <div className='container-fluid bg-dark py-5'>
+    <div className='container-fluid bg-light py-5'>
       <div className='container'>
         {source && <div className="row d-flex g-3 align-items-center justify-content-center cursor-pointer mb-3" >
           <div className='col-12'>
@@ -252,7 +251,7 @@ const FactCheckResultPage: FC<FactCheckResultPageProps> = ({ uuid, isModal }: Fa
         )}
         {(progress === 100 && isLoggedIn && !isRegistered) &&
           <div className='my-5'>
-            <div className='card p-3 mx-3 w-100 d-flex align-items-center bg-primary text-center'><p className='mb-1 fs-2'>This fact-check is not saved to your history.<br />Would you like to add it?</p> <button className='btn btn-warning ms-3' disabled={adding} onClick={addToHistoryHandler}>{adding ? 'Adding' : 'Add to History'}</button></div>
+            <div className='card p-3 mx-3 w-100 d-flex align-items-center bg-primary text-center'><p className='mb-1 fs-2'>This fact-check is not saved to your history.<br />Would you like to add it?</p> <button className='btn btn-secondary ms-3' disabled={adding} onClick={addToHistoryHandler}>{adding ? 'Adding' : 'Add to History'}</button></div>
           </div>}
         <div className="row d-flex g-5 p-3 justify-content-center">
           {details?.fact_check_overview && (
@@ -272,7 +271,7 @@ const FactCheckResultPage: FC<FactCheckResultPageProps> = ({ uuid, isModal }: Fa
                 <li className='col-6'>
                   <div className='card'><div className='card-header bg-success p-3 text-center'>Fully supported</div><div className='card-body text-center bg-secondary'> {details?.fact_check_overview.num_fully_supported}</div></div></li>
                 <li className='col-6'>
-                  <div className='card'><div className='card-header bg-warning p-3 text-center text-dark'>Partially supported</div><div className='card-body text-center bg-secondary'> {details?.fact_check_overview.num_partially_supported}</div></div></li>
+                  <div className='card'><div className='card-header bg-warning p-3 text-center text-light'>Partially supported</div><div className='card-body text-center bg-secondary'> {details?.fact_check_overview.num_partially_supported}</div></div></li>
                 <li className='col-6'>
                   <div className='card'><div className='card-header bg-danger p-3 text-center'>Not supported</div><div className='card-body text-center bg-secondary'> {details?.fact_check_overview.num_not_supported}</div></div></li>
               </ul>

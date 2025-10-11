@@ -14,7 +14,7 @@
 }
 
 .bg-secondary,
-.bg-dark {
+.bg-light {
   .formField:hover {
     .formField-label {
       color: $primary;
@@ -33,12 +33,18 @@
   position: relative;
   width: 100%;
 
+  &-hint {
+    color: $primary;
+    font-size: 12px;
+    margin-bottom: 0px;
+  }
+
   &:hover {
     .formField-label {
-      color: $primary;
+      color: $orange;
 
       span {
-        color: $primary;
+        color: $orange;
 
         i {
           color: white;
@@ -48,10 +54,10 @@
   }
 
   &-label {
-    color: white;
+    color: $black;
 
     span {
-      color: white;
+      color: $black;
       font-size: 14px;
     }
 

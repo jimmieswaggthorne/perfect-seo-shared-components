@@ -1,8 +1,9 @@
 /* eslint-disable no-restricted-globals, import/no-extraneous-dependencies */
 import classNames from 'classnames';
-import { ReactChild, useEffect, useMemo, useState } from 'react';
+import { ReactElement, useEffect, useMemo, useState } from 'react';
 
 import {
+  RowPinningState,
   SortingState,
   flexRender,
   getCoreRowModel,
@@ -35,6 +36,7 @@ export interface TableSortProps {
 }
 
 interface TableProps {
+  pinnedRows?: any[];
   draggable?: boolean;
   rawData: any[];
   columnArray: TableColumnArrayProps[];
@@ -65,6 +67,7 @@ const Table = ({ isLoading,
   footer = false,
   hideHeader,
   id,
+  pinnedRows,
   onChange,
   rowClassNames,
   zeroState = false,
@@ -72,11 +75,14 @@ const Table = ({ isLoading,
   rowOnClick,
   reorder,
   ...props }: TableProps) => {
-
+  //table states
   const [sorting, setSorting] = useState<SortingState>(sortedBy || []);
   const [data, setData] = useState<Object[]>([]);
   const [selected, setSelected] = useState<number>();
-
+  const [rowPinning, setRowPinning] = useState<RowPinningState>({
+    top: pinnedRows || [],
+    bottom: [],
+  })
   const reorderRow = (draggedRowIndex: number, targetRowIndex: number) => {
     data.splice(targetRowIndex, 0, data.splice(draggedRowIndex, 1)[0]);
     if (reorder) {
@@ -91,11 +97,15 @@ const Table = ({ isLoading,
 
       if (typeof column.accessor === 'string') {
         newColumn.accessorKey = column.accessor;
-      } else {
+      } else if (column.accessor) {
         newColumn.accessorKey = column.id;
         newColumn.cell = (obj) => {
           return column.accessor(obj.row.original, obj.row.index);
         };
+      }
+      else {
+        newColumn.accessorKey = column.id;
+
       }
 
       newColumn.header = newColumn.Header;
@@ -146,6 +156,7 @@ const Table = ({ isLoading,
     data,
     state: {
       sorting,
+      rowPinning,
     },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -193,7 +204,11 @@ const Table = ({ isLoading,
                     });
 
                     return (
-                      <th title={!column.columnDef.enableSorting ? 'Toggle Sorting' : header.id} onClick={(e) => { e.preventDefault(); }} className={columnHeaderClasses} key={header.id}>
+                      <th
+                        title={column.columnDef.enableSorting ? 'Toggle Sorting' : header.id}
+                        onClick={header.column.getToggleSortingHandler()}
+                        className={columnHeaderClasses}
+                        key={header.id}>
                         {header.isPlaceholder ?
                           null
                           : flexRender(
@@ -208,8 +223,57 @@ const Table = ({ isLoading,
             })}
           </thead>}
           <tbody>
+            {pinnedRows && tableInstance?.getTopRows()?.map(
+              (row, i) => {
+                let rowClassName;
 
-            {tableInstance.getRowModel().rows.map((row, i) => {
+                if (rowClassNames) {
+                  rowClassName = rowClassNames(row.original);
+                }
+
+                if (rowOnClick) {
+                  rowClassName = `${rowClassName} onClick`;
+                }
+
+
+                const clickHandler = (e) => {
+                  e.preventDefault();
+                  if (rowOnClick) {
+                    rowOnClick(row.original);
+                  }
+                };
+
+
+                return (
+                  <tr key={row.id} className={rowClassName} onClick={clickHandler}>
+                    {row.getVisibleCells().map((cell: any) => {
+
+                      const cellClasses = classNames('bg-primary', {
+                        [cell.column.columnDef.cellClassName]: cell.column.columnDef.cellClassName,
+                        [cell.column.columnDef.columnClassName]: cell.column.columnDef.columnClassName,
+                        [`cell-align-${cell.column.columnDef.cellTextAlign}`]: cell.column.columnDef.cellTextAlign,
+                        'onClick': cell.column.columnDef.onClick,
+                        'hidden': hideColumn?.includes(cell.column.columnDef.id),
+                      });
+
+                      const onClick = (e) => {
+                        e.preventDefault();
+                        if (cell.column.columnDef.onClick) {
+                          cell.column.columnDef.onClick(row.original);
+                        }
+                      };
+
+                      return (
+                        <td className={cellClasses} key={cell.id} onClick={onClick} data-label={cell.column.columnDef.header}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>);
+                    })}
+                  </tr>
+                );
+
+              }
+            )}
+            {tableInstance.getCenterRows().map((row, i) => {
               let rowClassName;
 
               if (rowClassNames) {
@@ -226,7 +290,6 @@ const Table = ({ isLoading,
                   rowOnClick(row.original);
                 }
               };
-
               if (draggable) {
                 return <DraggableRow selected={selected && selected} setSelected={setSelected} key={row.id} row={row} reorderRow={reorderRow} />;
               } else {
@@ -250,7 +313,7 @@ const Table = ({ isLoading,
                       };
 
                       return (
-                        <td className={cellClasses} key={cell.id} onClick={onClick}>
+                        <td className={cellClasses} key={cell.id} onClick={onClick} data-label={cell.column.columnDef.header}>
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>);
                     })}

@@ -1,11 +1,11 @@
 'use client';
-import { signIn, signOut } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import Link from 'next/link';
 import styles from './Header.module.scss';
 import classNames from 'classnames';
 import useViewport from '@/perfect-seo-shared-components/hooks/useViewport';
 import { useDispatch, useSelector } from 'react-redux';
-import { selectEmail, selectIsAdmin, selectIsLoading, selectIsLoggedIn, selectPoints, selectQueue, selectUser, setLoading, updatePoints } from '@/perfect-seo-shared-components/lib/features/User';
+import { selectEmail, selectIsAdmin, selectIsLoading, selectIsLoggedIn, selectPoints, selectUser, setLoading, setLoggedIn, setUser, updatePoints } from '@/perfect-seo-shared-components/lib/features/User';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { BrandStatus, Links, LinkType } from '@/perfect-seo-shared-components/data/types';
 import { useEffect, useMemo, useState } from 'react';
@@ -13,13 +13,10 @@ import { Brands } from '@/perfect-seo-shared-components/assets/Brands';
 import { renderIcon, renderLogo } from '@/perfect-seo-shared-components/utils/brandUtilities';
 import { usePathname } from 'next/navigation';
 import useGoogleUser from "@/perfect-seo-shared-components/hooks/useGoogleUser";
-import { addUserCredit, checkUserCredits, createUserCreditAccount } from "@/perfect-seo-shared-components/services/services";
+import { addUserCredit, checkUserCredits, createUserCreditAccount, populateBulkGSC } from "@/perfect-seo-shared-components/services/services";
 import { SEOPerfectLogo } from "@/perfect-seo-shared-components/assets/brandIcons";
-import axiosInstance from "@/perfect-seo-shared-components/utils/axiosInstance";
 import { createClient } from "@/perfect-seo-shared-components/utils/supabase/client";
 import en from '@/assets/en.json';
-import Queue from "@/perfect-seo-shared-components/components/Queue/Queue";
-import { useRouter } from "next/navigation";
 
 export interface HeaderProps {
   links?: Links[];
@@ -27,12 +24,11 @@ export interface HeaderProps {
   menuHeader?: any;
   hasLogin?: boolean;
   getCredits?: boolean;
-  hasQueue?: boolean
 }
 
-const Header = ({ links, menuHeader, current, hasLogin, getCredits, hasQueue }: HeaderProps) => {
+const Header = ({ links, menuHeader, current, hasLogin, getCredits }: HeaderProps) => {
   const points = useSelector(selectPoints);
-  const isLoggedIn = useSelector(selectIsLoggedIn);
+
   const isAdmin = useSelector(selectIsAdmin);
   const isLoading = useSelector(selectIsLoading);
   const user = useSelector(selectUser);
@@ -42,11 +38,35 @@ const Header = ({ links, menuHeader, current, hasLogin, getCredits, hasQueue }: 
   const { phone, desktop } = useViewport();
   const [currentPage, setCurrentPage] = useState('');
   const pathname = usePathname();
-  const queue = useSelector(selectQueue)
-  const router = useRouter();
-  const metricClickHandler = () => {
-    router.push('/watchlist')
-  }
+  const { data: session }: any = useSession();
+  const isLoggedIn = useSelector(selectIsLoggedIn);
+
+  // managing auth/session recognition 
+  useEffect(() => {
+    if (session && hasLogin) {
+
+      if (session?.token) {
+        const token = typeof session?.token === 'string' ? JSON.parse(session.token) : session?.token;
+        populateBulkGSC(token)
+      }
+
+      if (session === undefined) {
+        dispatch(setLoading(false));
+        dispatch(setLoggedIn(false));
+      }
+      if (session?.user) {
+        dispatch(setUser(session?.user));
+        dispatch(setLoggedIn(true));
+        localStorage.setItem('email', session?.user?.email)
+      }
+      if (session?.token?.access_token) {
+        localStorage.setItem('access_token', session?.token?.access_token);
+        localStorage.setItem('refresh_token', session?.token?.refresh_token);
+      }
+    }
+
+  }, [session])
+
   // Function to load credit data for the user
   const loadCreditData = () => {
     checkUserCredits(email)
@@ -83,23 +103,6 @@ const Header = ({ links, menuHeader, current, hasLogin, getCredits, hasQueue }: 
     }
   }, [email, getCredits]);
 
-  // Initialize Supabase client
-  const supabase = createClient();
-
-  // Effect to set up an interceptor for axios responses to log errors to Supabase
-  useEffect(() => {
-    axiosInstance.interceptors.response.use(
-      response => response,
-      error => {
-        supabase
-          .from('user_history')
-          .insert({ email: user?.email, transaction_data: error, product: en.product, type: "ERROR", action: "API Error" })
-          .select('*');
-        return Promise.reject(error);
-      }
-    );
-  }, []);
-
   // Custom hook to handle Google user
   useGoogleUser(current);
 
@@ -116,16 +119,27 @@ const Header = ({ links, menuHeader, current, hasLogin, getCredits, hasQueue }: 
     updateRoute(pathname);
   }, [pathname]);
 
+  const supabase = createClient()
+
   // Handler for Google login
   const loginWithGoogleHandler = (e) => {
     e?.preventDefault();
-    signIn('google', { callbackUrl: `${window.location.href}/` });
+    let url = `${window.location.origin}`;
+    supabase
+      .from('user_history')
+      .insert({ email: email, transaction_data: session, product: en.product, type: "INFO", action: "Login" })
+      .select('*')
+      .then(res => { })
+
+    signIn('google', { callbackUrl: url });
+
+
   };
 
   // Handler for sign out
   const signOutHandler = (e) => {
     e.preventDefault();
-    signOut().then(() => {
+    signOut({ redirect: true, callbackUrl: "/" }).then(() => {
       dispatch(setLoading(false));
       setOpen(false);
     });
@@ -160,67 +174,10 @@ const Header = ({ links, menuHeader, current, hasLogin, getCredits, hasQueue }: 
     setOpen(!open);
   };
 
-  const metrics = useMemo(() => {
-    let newMetrics = { posts: { completed: 0, total: 0, percentage: 0 }, outlines: { completed: 0, total: 0, percentage: 0 }, contentPlans: { completed: 0, total: 0, percentage: 0 } }
-    if (queue) {
-      queue.forEach((item) => {
-        if (item.type === 'post') {
-          newMetrics.posts.total++
-          if (item.isComplete === true) {
-            newMetrics.posts.completed++
-          }
-        }
-        else if (item.type === 'outline') {
-          newMetrics.outlines.total++
-          if (item.isComplete === true) {
-            newMetrics.outlines.completed++
-          }
-        }
-        else if (item.type === 'contentPlan') {
-          newMetrics.contentPlans.total++
-          if (item.isComplete === true) {
-            newMetrics.contentPlans.completed++
-          }
-        }
-      })
-    }
-    if (newMetrics.posts?.total >= 0) {
-      if (newMetrics.posts?.total === 0) {
-        newMetrics.posts.percentage = 0
-      }
-      else {
-        newMetrics.posts.percentage = Math.round((newMetrics.posts.completed / newMetrics.posts.total) * 100)
-      }
-    }
-    if (newMetrics.outlines?.total >= 0) {
-      if (newMetrics.outlines?.total === 0) {
-        newMetrics.outlines.percentage = 0
-      }
-      else {
-        newMetrics.outlines.percentage = Math.round((newMetrics.outlines.completed / newMetrics.outlines.total) * 100)
-      }
-    }
-    if (newMetrics.contentPlans?.total >= 0) {
-      if (newMetrics.contentPlans?.total === 0) {
-        newMetrics.contentPlans.percentage = 0
-      }
-      else {
-        newMetrics.contentPlans.percentage = Math.round((newMetrics?.contentPlans?.completed / newMetrics.contentPlans.total) * 100)
-      }
-    }
-    return newMetrics
-  }, [queue])
 
-  const metricClasses = classNames('d-flex align-items-center mt-2 p-0',
-    {
-      'cursor-pointer': isAdmin && queue?.length > 0 && currentPage !== '/watchlist',
-      'justify-content-end': desktop,
-      'justify-content-center': !desktop
-    }
-  )
+
   return (
     <header className={styles.header}>
-      {(!desktop && hasQueue) && <div className="d-none"><Queue /></div>}
       <div className='container-fluid container-xl'>
         <div className='row g-3 d-flex justify-content-between align-items-center'>
           <div className="col d-flex align-items-center justify-content-start">
@@ -230,154 +187,133 @@ const Header = ({ links, menuHeader, current, hasLogin, getCredits, hasQueue }: 
               </div>
             </Link>
           </div>
-          {isLoading === false && (
-            <div className={signedInClass}>
-              {hasLogin && (
-                <div className='col-auto flex-column pe-3 d-flex align-items-end'>
-                  {isLoggedIn ? desktop ? (
-                    <>
+          <div className={signedInClass}>
+            {(hasLogin && !isLoading) && (
+              <div className='col-auto flex-column pe-3 d-flex align-items-end'>
+                {!desktop ? null : isLoggedIn ?
+                  <div className="card p-1 px-3 bg-white">
+                    <div>
+                      <strong className='me-2 text-primary'>Logged in as</strong>
+                      {user?.email}
+                    </div>
+                    {points ? (
                       <div>
-                        <strong className='me-2 text-primary'>Logged in as</strong>
-                        {user?.email}
+                        <strong className='text-primary'>Credits</strong> {points.toLocaleString()}
                       </div>
-                      {(isAdmin && queue?.length > 0) ?
-                        <div className={metricClasses} onClick={metricClickHandler}>
-                          <span className="py-0 px-2" id="basic-addon1"><strong>Plans</strong></span>
-                          <span className="badge bg-primary py-1 px-2">{metrics?.contentPlans?.percentage}%</span>
-                          <span className="py-0 px-2" id="basic-addon1"><strong>Outlines</strong></span>
-                          <span className="badge bg-primary py-1 px-2">{metrics?.outlines?.percentage}%</span>
-                          <span className="py-0 px-2" id="basic-addon1"><strong>Posts</strong></span>
-                          <span className="py-1 px-2 badge bg-primary">{metrics?.posts?.percentage}%</span>
-                        </div> : points ? (
-                          <div>
-                            <strong className='text-primary'>Credits</strong> {points.toLocaleString()}
+                    ) : null}
+                  </div>
+                  :
+                  <button className="btn btn-google" onClick={loginWithGoogleHandler}>
+                    <img src="/images/google-icon.png" /> Login
+                  </button>
+                }
+              </div>
+            )}
+            {user?.image && (
+              <div className="col-auto me-3">
+                <img src={user?.image} className="user-icon cursor-pointer" onClick={imageClickHandler} />
+              </div>
+            )}
+            <DropdownMenu.Root modal defaultOpen open={open} onOpenChange={openChangeHandler}>
+              <DropdownMenu.Trigger className={styles.menuButton}>
+                <i className="bi bi-grid-3x3-gap-fill" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" sideOffset={25} className='bg-light card z-100'>
+                  <div className={styles.menu}>
+                    <div>
+                      {(hasLogin && !desktop && !isLoading) && (
+                        <div className='card-header bg-primary'>
+                          <div className='row justify-content-between d-flex'>
+                            {isLoggedIn ? (
+                              <>
+                                <div className='col-12 text-white'>
+                                  <strong className='me-2 text-white'>Logged in as</strong>
+                                  {user?.email}
+                                </div>
+                                {
+                                  points ? (
+                                    <div className='col-12 d-flex justify-content-start'>
+                                      <strong className='me-2 text-white'>Credits</strong> {points.toLocaleString()}
+                                    </div>
+                                  ) : null}
+                              </>
+                            ) : (
+                              <button className="btn btn-google" onClick={loginWithGoogleHandler}>
+                                <img src="/images/google-icon.png" alt="google logo for login" /> Login
+                              </button>
+                            )}
                           </div>
-                        ) : null}
-                    </>
-                  ) : null : (
-                    <button className="btn btn-google" onClick={loginWithGoogleHandler}>
-                      <img src="/images/google-icon.png" /> Login
-                    </button>
-                  )}
-                </div>
-              )}
-              {user?.image && (
-                <div className="col-auto me-3">
-                  <img src={user?.image} className="user-icon cursor-pointer" onClick={imageClickHandler} />
-                </div>
-              )}
-              <DropdownMenu.Root modal defaultOpen open={open} onOpenChange={openChangeHandler}>
-                <DropdownMenu.Trigger className={styles.menuButton}>
-                  <i className="bi text-primary bi-grid-3x3-gap-fill" />
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content align="end" sideOffset={25} className='bg-dark card z-100'>
-                    <div className={styles.menu}>
-                      <div>
-                        {(hasLogin && !desktop && !isLoading) && (
-                          <div className='card-header bg-secondary text-white'>
-                            <div className='row justify-content-between d-flex'>
-                              {isLoggedIn ? (
-                                <>
-                                  <div className='col-12 text-white'>
-                                    <strong className='me-2 text-primary'>Logged in as</strong>
-                                    {user?.email}
-                                  </div>
-                                  {(isAdmin && queue?.length > 0) ?
-                                    <div className={metricClasses} onClick={metricClickHandler}>
-                                      <span className="py-0 px-2" id="basic-addon1"><strong>Plans</strong></span>
-                                      <span className="badge bg-primary py-1 px-2">{metrics?.contentPlans?.percentage}%</span>
-                                      <span className="py-0 px-2" id="basic-addon1"><strong>Outlines</strong></span>
-                                      <span className="badge bg-primary py-1 px-2">{metrics?.outlines?.percentage}%</span>
-                                      <span className="py-0 px-2" id="basic-addon1"><strong>Posts</strong></span>
-                                      <span className="py-1 px-2 badge bg-primary">{metrics?.posts?.percentage}%</span>
-                                    </div> :
-                                    points ? (
-                                      <div className='col-12 d-flex justify-content-start'>
-                                        <strong className='me-2 text-primary'>Credits</strong> {points.toLocaleString()}
-                                      </div>
+                          {menuHeader ? menuHeader : null}
+                        </div>
+                      )}
+                      <div className='row g-2 justify-content-end p-3'>
+                        {dynamicLinks?.length > 0 && (
+                          <>
+                            {currentPage !== "/" && (
+                              <div className='col-12'>
+                                <Link href="/" className="text-primary">
+                                  <i className="bi bi-house-fill me-2 text-primary" />Return Home
+                                </Link>
+                              </div>
+                            )}
+                            {dynamicLinks.map((link, index) => {
+                              let href = typeof link.href === 'function' ? link.href(user) : link.href;
+                              return (
+                                <div className='col-12' key={link.href}>
+                                  <Link href={href} className={currentPage === href ? 'text-dark' : 'text-primary'}>
+                                    {link?.type === LinkType.ADMIN ? (
+                                      <i className="bi text-primary bi-shield-lock-fill me-2" title="Admin Only" />
+                                    ) : link?.type === LinkType.PRIVATE ? (
+                                      <i className="bi text-primary bi-person-check-fill me-2" title="Logged In Only" />
                                     ) : null}
-                                </>
-                              ) : (
-                                <button className="btn btn-google" onClick={loginWithGoogleHandler}>
-                                  <img src="/images/google-icon.png" alt="google logo for login" /> Login
-                                </button>
-                              )}
-                            </div>
-                            {menuHeader ? menuHeader : null}
-                          </div>
-                        )}
-                        <div className='row g-2 justify-content-end p-3'>
-                          {dynamicLinks?.length > 0 && (
-                            <>
-                              {currentPage !== "/" && (
-                                <div className='col-12'>
-                                  <Link href="/">
-                                    <i className="bi bi-house-fill me-2 text-white" />Return Home
+                                    {link.label}
                                   </Link>
                                 </div>
-                              )}
-                              {dynamicLinks.map((link, index) => {
-                                let href = typeof link.href === 'function' ? link.href(user) : link.href;
-                                return (
-                                  <div className='col-12' key={link.href}>
-                                    <Link href={href} className={currentPage === href ? 'text-white' : 'text-primary'}>
-                                      {link?.type === LinkType.ADMIN ? (
-                                        <i className="bi text-white bi-shield-lock-fill me-2" title="Admin Only" />
-                                      ) : link?.type === LinkType.PRIVATE ? (
-                                        <i className="bi text-white bi-person-check-fill me-2" title="Logged In Only" />
-                                      ) : null}
-                                      {link.label}
-                                      {link?.href === '/watchlist' &&
-                                        <div className="input-group">
-                                        </div>}
-                                    </Link>
-                                  </div>
-                                );
-                              })}
-                            </>
-                          )}
-                          {hasLogin && isLoggedIn && (
-                            <div className='col-12'>
-                              <a className="text-primary" onClick={signOutHandler}>
-                                <i className="bi text-white bi-unlock-fill me-2" />Sign Out
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className='card-body d-flex align-items-end'>
-                        <div className='row g-3 justify-content-start'>
-                          <div className='col-4 text-end d-flex align-items-center justify-content-center'>
-                            <span className='fs-2 mb-3'>Our Products</span>
+                              );
+                            })}
+                          </>
+                        )}
+                        {hasLogin && isLoggedIn && (
+                          <div className='col-12'>
+                            <a className="text-primary" onClick={signOutHandler}>
+                              <i className="bi text-primary bi-unlock-fill me-2" />Sign Out
+                            </a>
                           </div>
-                          {Brands.filter((obj) => obj.status === BrandStatus.LIVE).map((brand, index) => (
-                            <div key={index} className='col-4 text-center'>
-                              <a href={brand.url} className={styles.brandUrl} target="_blank">
-                                <div className={styles.brandIcon}>{renderIcon(brand.title)}</div>
-                                {brand.title.replace(".ai", "")}
-                              </a>
-                            </div>
-                          ))}
-                          <div className="col-12 d-flex justify-content-center align-items-center">
-                            <div className="h-100 w-75">
-                              <a href='https://seoperfect.ai/' className="w-100" target="_blank">
-                                <SEOPerfectLogo />
-                              </a>
-                            </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className='card-body d-flex align-items-end'>
+                      <div className='row g-3 justify-content-start'>
+                        <div className='col-4 text-end d-flex align-items-center justify-content-center text-dark'>
+                          <span className='fs-2 mb-3'>Our Products</span>
+                        </div>
+                        {Brands.filter((obj) => obj.status === BrandStatus.LIVE).map((brand, index) => (
+                          <div key={index} className='col-4 text-center'>
+                            <a href={brand.url} className={styles.brandUrl} target="_blank">
+                              <div className={styles.brandIcon}>{renderIcon(brand.title)}</div>
+                              {brand.title.replace(".ai", "")}
+                            </a>
+                          </div>
+                        ))}
+                        <div className="col-12 d-flex justify-content-center align-items-center">
+                          <div className="h-100 w-75">
+                            <a href='https://seoperfect.ai/' className="w-100" target="_blank">
+                              <SEOPerfectLogo />
+                            </a>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-            </div>
-          )}
+                  </div>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </div>
         </div>
       </div>
 
-    </header>
+    </header >
   );
 };
 

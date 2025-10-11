@@ -55,29 +55,20 @@ const ContentStatusItem = ({ item, deleteContent, idx }) => {
     <li className="card p-3 bg-secondary">
       <div className="row d-flex align-items-center justify-content-between g-3">
         {error ?
-          <>          <div className="text-capitalize text-warning col-10 col-md-8"><TypeWriterText withBlink string={error} /></div>
-            <div className="col d-flex justify-content-end">
-              <button disabled={loading} className="btn btn-primary ms-3" title="Remove from Watchlist" onClick={e => {
-                e.preventDefault();
-                deleteContent(idx)
-              }}>
-                <i className="bi bi-x" /> <span className="d-none d-md-block">Remove from Watchlist</span>
-              </button>
-            </div>
-          </>
+          <div className="text-capitalize text-warning col-10 col-md-8"><TypeWriterText withBlink string={error} /></div>
+
+
           :
           <>
-            <div className="text-capitalize col-12 col-md-4"><span className="d-md-none text-primary me-1"><strong>Keyword</strong></span> {item?.target_keyword}</div>
+            <div className="text-capitalize col-12 col-md-4">
+              <span className="d-md-none text-primary me-1"><strong>Keyword</strong></span> {item?.target_keyword}
+            </div>
             <div className="capitalize d-none d-lg-block col-4">{item?.domain_name}</div>
             <div className="col-12 col-md-8 col-lg-4 d-flex align-items-center justify-content-between">
-              <div className="text-capitalize text-primary"><span className="d-md-none text-white me-1"><strong>Status</strong></span><TypeWriterText withBlink string={status} /></div>
-              <button disabled={loading} title="Remove from Watchlist" className="btn btn-primary ms-3" onClick={e => {
-                e.preventDefault();
-                deleteContent(idx)
-              }}>
-                <i className="bi bi-x" />  <span className="d-none d-md-block">Remove from Watchlist</span>
-              </button>
-            </div></>}
+              <div className="text-capitalize text-primary"><span className="d-md-none text-white me-1"><strong>Status</strong></span><TypeWriterText withBlink string={status} />
+              </div>
+            </div>
+          </>}
       </div>
     </li >
   )

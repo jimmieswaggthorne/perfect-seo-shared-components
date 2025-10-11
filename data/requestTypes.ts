@@ -32,36 +32,28 @@ export interface SaveContentPost {
 }
 
 export interface PostOutlineGenerateRequest {
-  guid?: string,
   content_plan_guid: string,
   post_title: string,
-  client_name: string,
-  client_domain: string,
-  writing_language?: string
+  content_plan_keyword: string,
+  post_keyword: string,
+  domain: string
+}
+
+export interface RegeneratePost {
+  content_plan_outline_guid: string,
+  email?: string,
+  receiving_email?: string
 }
 
 export interface GenerateContentPost {
-  email: string,
-  keyword: string,
-  seo_keyword: string,
-  content_plan_keyword: string,
-  content_plan_guid: string,
   content_plan_outline_guid: string,
-  client_name: string,
-  client_domain: string,
+  email: string,
   receiving_email: string,
-  outline: {
-    sections: OutlineRowProps[]
-  }
-  status?: string,
   entity_voice?: string,
-  inspiration_url_1?: string,
-  priority1?: 'high' | 'medium' | 'low'
-  inspiration_url_2?: string,
-  priority2?: 'high' | 'medium' | 'low'
-  inspiration_url_3?: string,
-  priority3?: 'high' | 'medium' | 'low',
   writing_language?: string,
+  html_template_url?: string,
+  voice_url?: string,
+  custom_outline?: string
 }
 
 export interface ContentPlanPostRequest {
@@ -175,3 +167,9 @@ export interface PageRequest extends DateAndPageRequest {
 export interface DomainReportsRequest extends DateAndPageRequest {
   domain: string,
 }
+
+export interface GSCTotalsRequest extends DateRangeRequest {
+  domain: string,
+  limit: number
+}
+

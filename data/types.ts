@@ -1,3 +1,5 @@
+import { OutlinesListProps } from "../components/OutlinesList/OutlinesList";
+
 export interface BrandInfo {
   "domain_name"?: string,
   "brand_name"?: string,
@@ -223,6 +225,18 @@ export interface Sitemap {
 }
 
 
+export interface Outline {
+  content_plan_guid: string;
+  created_at: string;
+  domain: string;
+  email: string;
+  guid: string;
+  outline: string | null;
+  post_title: string;
+  status: string;
+  client_name?: string
+  keyword?: string;
+}
 
 export interface PostUploadItem {
   additional_data_URL?: string;
@@ -670,24 +684,6 @@ export interface PlayerProps {
 
 }
 
-export interface AssocGUIDS {
-  guid: string,
-  type: 'outline' | 'contentPlan' | 'post'
-  isComplete?: boolean
-}
-
-export interface QueueItemProps {
-  created_at?: string,
-  type: 'outline' | 'contentPlan' | 'post',
-  domain: string,
-  guid: string,
-  associatedGuids?: AssocGUIDS[],
-  isComplete?: boolean;
-  email: string;
-  data?: any
-  id?: string
-}
-
 export interface ToastProps {
   id?: string
   title: string
@@ -717,6 +713,13 @@ export interface PostProps {
   factcheck_status: string
   index_guid: string
   index_status: string
+  schema_data?: any,
+  hero_image_prompt?: string,
+  hero_image_url?: string;
+  hero_image_thinking?: string;
+  writing_language?: string
+  last_updated_at?: string;
+  image_url?: string;
 }
 
 export interface Synopsis {
@@ -809,9 +812,170 @@ export enum ClaimResultStatus {
   FULLY_SUPPORTED = 'fully supported by the sources',
 }
 
-export enum StatusType {
-  PLAN,
-  OUTLINE,
-  POST,
-  FACTCHECK
+export enum ContentType {
+  PLAN = 'plan',
+  OUTLINE = 'outline',
+  POST = 'post',
+  FACTCHECK = 'factcheck'
+}
+
+export interface SchemaProgress {
+  errors: string[];
+  error_count: number;
+  total_count: number;
+  completed_count: number;
+}
+
+export interface Schema {
+  id: string;
+  user_id: string;
+  domain: string;
+  status: string;
+  started_at: string;
+  finished_at: string;
+  created_at: string;
+  updated_at: string;
+  error_details: string | null;
+  progress: SchemaProgress;
+  urls: string[];
+  processing_instance_id: string | null;
+  processing_started_at: string | null;
+  processing_heartbeat_at: string | null;
+}
+
+export interface Domain {
+  domain?: string;
+  updated_date: string;
+  hidden: boolean;
+
+}
+
+export interface URLProps {
+  url: string;
+  lastSubmitted: string | null;
+  indexCheckedDate: string | null;
+  isIndexed: boolean;
+  submissionHistory: string[];
+}
+
+export interface CheckIndexationResponse {
+  success: boolean;
+  url: string;
+  siteUrl: string;
+  coverageState: string;
+  emoji: string;
+  status: {
+    inspectionResultLink: string;
+    indexStatusResult: IndexStatusResult;
+    mobileUsabilityResult: MobileUsabilityResult;
+  };
+  result: GoogleApiResult
+}
+
+export interface IndexStatusResult {
+  verdict: string;
+  coverageState: string;
+  robotsTxtState: string;
+  indexingState: string;
+  lastCrawlTime: string;
+  pageFetchState: string;
+  googleCanonical: string;
+  userCanonical: string;
+  sitemap: string[];
+  referringUrls: string[];
+  crawledAs: string;
+}
+
+export interface MobileUsabilityResult {
+  verdict: string;
+}
+
+export interface IndexContentResponse {
+  indexingGuid: string;
+  contentPlanOutlineGuid: string | null;
+  url: string;
+  timestamp: string;
+  reindexed: boolean | null;
+  success: boolean;
+  statusUpdated: string | null;
+  googleApiResponse: GoogleApiResponse;
+}
+
+export interface GoogleApiResponse {
+  success: boolean;
+  url: string;
+  siteUrl: string;
+  result: GoogleApiResult;
+}
+
+export interface GoogleApiResult {
+  urlNotificationMetadata: UrlNotificationMetadata;
+}
+
+export interface UrlNotificationMetadata {
+  url: string;
+}
+
+// Database table interfaces
+export interface IndexingRequest {
+  id: string;
+  url: string;
+  site_url?: string;
+  content_plan_outline_guid?: string;
+  indexing_guid?: string;
+  success: boolean;
+  reindexed?: boolean;
+  google_api_response?: any;
+  user_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IndexationCheck {
+  id: string;
+  url: string;
+  site_url?: string;
+  coverage_state?: string;
+  indexing_state?: string;
+  is_indexed: boolean;
+  last_crawl_time?: string;
+  inspection_result_link?: string;
+  status_result?: IndexStatusResult;
+  mobile_usability_result?: MobileUsabilityResult;
+  emoji?: string;
+  user_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Combined view interface for displaying URLs with both submission and check data
+export interface URLDisplayData {
+  url: string;
+  site_url?: string;
+
+  // From indexing_requests (latest submission)
+  latest_submission?: {
+    id: string;
+    indexing_guid?: string;
+    success: boolean;
+    reindexed?: boolean;
+    submitted_at: string;
+  };
+
+  // From indexation_checks (latest check)
+  latest_check?: {
+    id: string;
+    coverage_state?: string;
+    indexing_state?: string;
+    is_indexed: boolean;
+    last_crawl_time?: string;
+    checked_at: string;
+    emoji?: string;
+  };
+  user?: string;
+  // Computed fields
+  submission_count: number;
+  last_submitted?: string;
+  last_checked?: string;
+  current_status: 'indexed' | 'pending' | 'not_submitted' | 'failed';
 }

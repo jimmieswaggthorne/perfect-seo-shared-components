@@ -3,18 +3,12 @@ import styles from './Footer.module.scss'
 import PerfectSEOBar from "../PerfectSEOBar/PerfectSEOBar"
 import { SEOPerfectLogo } from '@/perfect-seo-shared-components/assets/brandIcons'
 import moment from 'moment-timezone'
-import classNames from 'classnames'
-import { useSelector } from 'react-redux'
-import { selectShowQueue } from '@/perfect-seo-shared-components/lib/features/User'
 
 const Footer = ({ current }) => {
-  const showQueue = useSelector(selectShowQueue)
 
-  const footerClasses = classNames('mb-5', {
-    'queue-footer': showQueue
-  })
+
   return (
-    <footer className={footerClasses}>
+    <footer>
       <div className="container-fluid container-xl">
         <PerfectSEOBar current={current} />
       </div>

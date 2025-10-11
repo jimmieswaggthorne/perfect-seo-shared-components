@@ -80,6 +80,7 @@ const usePaginator = (): PaginatorController => {
     let pageCount = Math.ceil(itemCount / limit);
     let pages = new Array(pageCount).fill(1).map((obj, i) => i + 1);
     let groupStart, groupEnd;
+
     if (!itemCount || itemCount === 0) {
 
     }
@@ -99,7 +100,7 @@ const usePaginator = (): PaginatorController => {
       groupStart = currentPage - 1;
     }
 
-    let startIndex = currentPage * limit;
+    let startIndex = currentPage === 1 ? 0 : currentPage * limit;
     let endIndex = startIndex + limit;
 
     if (currentPage === pageCount) {
@@ -148,7 +149,7 @@ const usePaginator = (): PaginatorController => {
       }
     }, [currentPage])
 
-    if (pageCount > 1) {
+    if (pageCount >= 1) {
       return (
         <div className='row d-flex align-items-center justify-content-between g-3'>
           <div className='col'>
@@ -186,8 +187,8 @@ const usePaginator = (): PaginatorController => {
 
               <button className={rightArrowButtonClasses} onClick={() => onClick((currentPage + 1))} disabled={currentPage === pageCount}><i className='bi bi-caret-right-fill' /></button>
             </nav >
-          </div >
-          <div className='col-12 col-md-auto'>
+          </div>
+          {itemCount >= 10 && <div className='col-12 col-md-auto'>
             <div className='d-flex align-items-center justify-content-start'>
               <label className='mb-0 no-wrap'>Page Size</label>
               <select className='form-select ms-2' value={limit} onChange={(e) => {
@@ -196,10 +197,15 @@ const usePaginator = (): PaginatorController => {
               }
               }>
                 <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
+                {itemCount > 10 && <option value={25}>25</option>}
+                {itemCount > 25 && <option value={50}>50</option>}
+                {itemCount > 50 && <option value={100}>100</option>}
               </select>
+            </div>
+          </div>}
+          <div className='col-12 col-md-auto'>
+            <div className='d-flex align-items-center justify-content-start'>
+              <label className='mb-0 no-wrap me-2'>Total</label> {itemCount}
             </div>
           </div>
         </div >

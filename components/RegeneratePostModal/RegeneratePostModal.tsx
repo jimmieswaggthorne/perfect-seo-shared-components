@@ -4,10 +4,21 @@ import { selectEmail, selectPoints } from "@/perfect-seo-shared-components/lib/f
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import SearchSelect from "../SearchSelect/SearchSelect";
+import { Option, Select } from "../Form/Select";
+import useForm from "@/perfect-seo-shared-components/hooks/useForm";
+import Form from "../Form/Form";
+import { createClient } from "@/perfect-seo-shared-components/utils/supabase/client";
+import en from "@/assets/en.json";
 
 export enum GenerateTypes {
   REGENERATE,
   GENERATE
+}
+
+export enum GenerationTypes {
+  REGENERATE_ALL,
+  REGENERATE_STYLE,
+  REGENERATE_CONTENT
 }
 
 interface RegeneratePostModalProps {
@@ -15,15 +26,17 @@ interface RegeneratePostModalProps {
   submitHandler: (email, language?: string) => Promise<any>
   type: GenerateTypes;
   onSuccess: () => void;
+  submitHTMLStylingHandler: (email, language?: string) => Promise<any>;
+  submitGoogleDocRegenerateHandler: (email, language?: string) => Promise<any>;
+  title: string;
 }
 
-const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess }: RegeneratePostModalProps) => {
+const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess, submitHTMLStylingHandler, submitGoogleDocRegenerateHandler, title }: RegeneratePostModalProps) => {
   const points = useSelector(selectPoints)
   const [showConfirm, setShowConfirm] = useState(false)
   const email = useSelector(selectEmail)
   const [receivingEmail, setReceivingEmail] = useState(undefined);
   const [submitted, setSubmitted] = useState(false);
-
   const regenerate = type === GenerateTypes.REGENERATE;
   const languageOptions = [
     "English",
@@ -62,12 +75,20 @@ const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess }: Regene
     "Urdu",
     "Vietnamese"
   ].map((language) => ({ label: language, value: language }))
+  const form = useForm();
 
   useEffect(() => {
     if (email) {
       setReceivingEmail(email);
     }
   }, [email]);
+
+  useEffect(() => {
+    if (type === GenerateTypes.REGENERATE) {
+      form.setState({ 'generation-type': 'all' })
+    }
+  }, [type]);
+
 
 
   useEffect(() => {
@@ -83,18 +104,65 @@ const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess }: Regene
     }
   }, [submitted])
 
+  const supabase = createClient();
+
   const generatePostHandler = () => {
     setSubmitError(null)
     setSubmitted(true)
-    submitHandler(receivingEmail, langSelected.value)
-      .then(() => {
-        setShowConfirm(true);
-        setSubmitted(false)
-      })
-      .catch(() => {
-        setSubmitError("There was an error submitting your post. Please try again.")
-        setSubmitted(false)
-      });
+    let type = form.getState['generation-type']
+    // supabase
+    //   .from('tasks')
+    //   .update({ 'live_post_url': null })
+    //   .eq('post_title', title)
+    switch (type) {
+      case 'all':
+        return submitHandler(receivingEmail, langSelected.value)
+          .then(() => {
+            setShowConfirm(true);
+            setSubmitted(false)
+          })
+          .catch((err) => {
+            supabase
+              .from('user_history')
+              .insert({ email: email, transaction_data: err, product: en.product, type: "ERROR", action: "Regenerate All Error" })
+              .select('*')
+              .then(res => { })
+            console.log(err);
+            setSubmitError(err.response?.data?.detail || "There was an error submitting your post. Please try again.")
+            setSubmitted(false)
+          });
+      case 'style':
+        return submitHTMLStylingHandler(receivingEmail, langSelected.value)
+          .then(() => {
+            setShowConfirm(true);
+            setSubmitted(false)
+          })
+          .catch((err) => {
+            setSubmitError(err.response?.data?.detail || "There was an error submitting your post. Please try again.")
+            setSubmitted(false)
+          });
+      case 'content':
+        return submitGoogleDocRegenerateHandler(receivingEmail, langSelected.value)
+          .then(() => {
+            setShowConfirm(true);
+            setSubmitted(false)
+          })
+          .catch((err) => {
+            setSubmitError(err.response?.data?.detail || "There was an error submitting your post. Please try again.")
+            setSubmitted(false)
+          });
+
+      default:
+        return submitHandler(receivingEmail, langSelected.value)
+          .then(() => {
+            setShowConfirm(true);
+            setSubmitted(false)
+          })
+          .catch(() => {
+            setSubmitError("There was an error submitting your post. Please try again.")
+            setSubmitted(false)
+          });
+    }
   }
 
 
@@ -102,20 +170,33 @@ const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess }: Regene
     window.open("/my-credits", "_blank");
   };
 
-  const [submitError, setSubmitError] = useState("");
+  const [submitError, setSubmitError] = useState<string>();
   const [langSelected, setLangSelected] = useState({ label: 'English', value: 'English' });
-
 
 
   const languageChangeHandler = (e) => {
     setLangSelected(e);
   }
 
+  const renderHint = () => {
+    let type = form.getState['generation-type']
+    switch (type) {
+      case 'all':
+        return 'Regenerate the post from outline.';
+      case 'style':
+        return 'Update the HTML styling of the post. Use this when you have made changes to your post templates in preferencesPerfect.ai and want to apply them to this post.';
+      case 'content':
+        return 'Update the content of the post from the Google Doc. Use this when you have made changes to the Google Doc and want to apply them to this post.';
+      default:
+        return 'Regenerate this post from the outline.'
+    }
+  }
 
   return (
     <>  <Modal.Title title="Generate Your Post" />
-      <div className="p-5">
-        <h3 className="mb-3">{regenerate ? 'Reg' : 'G'}enerate Your Post</h3>
+      <div className="p-5 modal-medium pb-0">
+        <h3 className="mb-3">{regenerate ? 'Reg' : 'G'}enerate Your Post{title &&
+          <span> for {title}</span>}</h3>
         {regenerate ? <div className="my-4">
           Would you like to regenerate this post?
         </div>
@@ -155,14 +236,26 @@ const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess }: Regene
           <div className="mt-3">
             <label htmlFor="writing_language">Writing Language</label>
             <SearchSelect value={langSelected} onChange={languageChangeHandler} options={languageOptions} fieldName="writing_language z-100" isClearable={false} isSearchable={true} />
-            {submitError && <p className="text-danger mt-3">{submitError}</p>}
           </div>
+          {type === GenerateTypes.REGENERATE &&
+            <div className="mt-3">
+              <label htmlFor="generation-type">Regeneration Type</label>
+              <Form controller={form}>
+                <Select fieldName="generation-type" bottomSpacing={false}>
+                  <Option value='all'>Regenerate Full Post</Option>
+                  <Option value='style'>Update HTML Doc Styling</Option>
+                  <Option value='content'>Update Content from Google Doc</Option>
+                </Select>
+                <p className="mb-0 mt-1"><small><strong>{renderHint()}</strong></small></p>
+              </Form>
+            </div>}
+          {submitError && <p className="text-danger mt-3">{submitError}</p>}
         </div>}
-      </div>
+      </div >
       <Modal.Footer>
         <Modal.ButtonBar>
           <button
-            className="btn btn-warning btn-standard"
+            className="btn btn-secondary btn-standard"
             onClick={(e) => {
               e.preventDefault();
               onClose();
@@ -198,10 +291,10 @@ const RegeneratePostModal = ({ onClose, type, submitHandler, onSuccess }: Regene
       <Modal.Overlay closeIcon open={showConfirm} onClose={onClose}>
         <Modal.Title title="Post Generation" />
         <div className="p-5 d-flex flex-column align-items-center">
-          <h3 className="mb-5">Your post is being generated</h3>
+          <h3 className="mb-5">Your post{title && ` for ${title}`} is being generated</h3>
           <div>
             <button
-              className="btn btn-warning"
+              className="btn btn-secondary"
               onClick={(e) => {
                 e.preventDefault();
                 setShowConfirm(false);

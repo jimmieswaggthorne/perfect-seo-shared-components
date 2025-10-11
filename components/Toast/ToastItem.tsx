@@ -14,7 +14,7 @@ const ToastItem = ({ title, content, ...props }) => {
   }
   return (
     <ToastPrimitive.Root {...props} onOpenChange={changeHandler}>
-      <div className="bg-dark card toast-card w-100 mt-2">
+      <div className="bg-light card toast-card w-100 mt-2">
         <div className="p-1 px-2 row d-flex align-items-center">
           {/* <div className="col-auto">
           </div> */}

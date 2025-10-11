@@ -89,7 +89,7 @@ export const Brands: Array<Brand> = [
     url: 'https://schemaPerfect.ai',
     logo: '/svg/schemaPerfect.svg',
     icon: '/svg/schemaPerfect-icon.svg',
-    // summary: "Perfect your e-commerce product pages with more detailed product descriptions, features, specifications, and product information using AI.",
+    summary: "schemaPerfect.ai uses advanced AI to automatically generate accurate and comprehensive JSON-LD schemas for any web page, improving your SEO and structured data implementation.",
     status: BrandStatus.COMING_SOON,
     primary: "#235789",
   },

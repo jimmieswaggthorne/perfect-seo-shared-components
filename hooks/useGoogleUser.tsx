@@ -1,25 +1,25 @@
 'use client'
 import { useDispatch, useSelector } from "react-redux";
-import { useEffect, useState } from 'react'
-import { reset, selectDomainsInfo, selectIsLoggedIn, selectProfile, selectUser, setAdmin, setDomainInfo, setLoading, setLoggedIn, setProfile, setUser, setUserSettings } from '@/perfect-seo-shared-components/lib/features/User'
+import { useEffect } from 'react'
+import { selectEmail, selectIsLoggedIn, selectProfile, selectUser, setAdmin, setLoading, setProfile, setUserSettings } from '@/perfect-seo-shared-components/lib/features/User'
 import { createClient } from '@/perfect-seo-shared-components/utils/supabase/client'
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { urlSanitization } from '../utils/conversion-utilities';
 import { useSession } from 'next-auth/react';
 import { SettingsProps } from '../data/types';
-import { getSynopsisInfo } from '../services/services';
+import en from '@/assets/en.json'
 const useGoogleUser = (appKey) => {
+  const isDev = process.env.NODE_ENV === 'development';
+
   const isLoggedIn = useSelector(selectIsLoggedIn)
   const profile = useSelector(selectProfile)
   const user = useSelector(selectUser)
-  const domainsInfo = useSelector(selectDomainsInfo)
-  const [token, setToken] = useState(null)
-  const [userData, setUserData] = useState<any>(null)
+  const email = useSelector(selectEmail)
   const dispatch = useDispatch();
   const supabase = createClient()
 
-  const { data: session, status } = useSession()
+  const { data: session }: any = useSession()
 
   const getSettings = () => {
     supabase
@@ -48,78 +48,101 @@ const useGoogleUser = (appKey) => {
       })
   }
 
-
+  // Pull user settings on login, establish subscription to listen for changes
   useEffect(() => {
+
     let settingsChannel;
-    if (profile?.email && isLoggedIn) {
+    let profileChannel;
+    if (email && isLoggedIn) {
+
+      // retrieve settings
       getSettings()
       settingsChannel = supabase.channel('settings-channel')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'settings', filter: `email=eq.${profile?.email}` },
+          { event: 'UPDATE', schema: 'public', table: 'settings', filter: `email=eq.${email}` },
           (payload) => {
-            dispatch(setUserSettings(payload.new as SettingsProps))
+            if (payload?.new) {
+              dispatch(setUserSettings(payload.new as SettingsProps))
+            }
           }
         )
         .subscribe()
+      profileChannel = supabase.channel('profile-channel')
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `email=eq.${email}` },
+          (payload) => {
+            if (payload?.new) {
+              let newProfile: any = payload.new
+              dispatch(setAdmin(newProfile?.admin))
+              dispatch(setProfile(newProfile))
+            }
+            dispatch(setProfile(payload.new))
+          }
+        )
+        .subscribe()
+      // retrieve profile 
+      supabase
+        .from('profiles')
+        .select("*")
+        .eq('email', email)
+        .then(res => {
+          if (res?.data && res?.data?.length > 0) {
+            let newProfile = res.data[0]
+            let products = updateProducts(res?.data[0])
+            if (newProfile.full_name !== user?.name) {
+              newProfile.full_name = user?.name
+            }
+            dispatch(setAdmin(res.data[0]?.admin))
+            dispatch(setProfile({ ...newProfile, products }))
+            if (!newProfile?.domain_access) {
+              fetchAllDomains()
+            }
+          }
+          else if (res?.data?.length === 0) {
+            let profileObj: any = { email: user.email, full_name: user?.name }
+            if (user.email.includes("atidiv") || user.email.includes('loud.us')) {
+              profileObj = { ...profileObj, admin: true }
+            }
+            supabase
+              .from('profiles')
+              .upsert(profileObj)
+              .eq('email', email)
+              .select("*")
+              .then(res => {
+                if (res?.data && res?.data?.length > 0) {
+                  if (res?.data[0]) {
+                    let newProfile = res.data[0]
+                    let products = updateProducts(res?.data[0])
+                    dispatch(setAdmin(res.data[0]?.admin))
+                    dispatch(setProfile({ ...newProfile, products }))
+                    if (!newProfile?.domain_access?.length) {
+                      fetchAllDomains()
+                    }
+                  }
+                }
+              })
+          }
+        })
     }
     return () => {
       if (settingsChannel) {
         settingsChannel.unsubscribe()
       }
-    }
-  }, [profile, isLoggedIn])
-
-  useEffect(() => {
-    if (session === null) {
-      dispatch(setLoggedIn(false))
-      dispatch(setLoading(false))
-    }
-  }, [session])
-
-  //set status based on loading of session
-  useEffect(() => {
-    let sessionData: any = session;
-    switch (status) {
-      case 'loading':
-        dispatch(setLoading(true));
-        break;
-      case 'authenticated':
-        dispatch(setLoading(false));
-        dispatch(setLoggedIn(true));
-        break;
-      case 'unauthenticated':
-        dispatch(reset())
-        break;
-    }
-    if (session) {
-      if (session?.user) {
-        dispatch(setLoading(false))
-        dispatch(setUser(session.user))
-        localStorage.setItem('email', session.user.email)
+      if (profileChannel) {
+        profileChannel.unsubscribe()
       }
     }
-    else if (session === null) {
-      dispatch(reset())
-    }
-    if (sessionData?.access_token) {
-      setToken(sessionData.access_token)
-    }
-    else {
-      setToken(null)
-    }
-  }, [status])
+  }, [user, isLoggedIn])
 
-  //Checks User Domains
   useEffect(() => {
-    if (token && !(profile?.domain_access || profile?.domains) && profile?.email) {
-      checkUserDomains();
-    }
-  }, [token, profile])
+    dispatch(setLoading(!!(isLoggedIn && !profile)))
+  }, [isLoggedIn, profile])
 
   // updates product use 
-  const updateProducts = () => {
-    let products = { ...userData.products }
+  const updateProducts = (profile): any => {
+    let products: any = profile?.products || {}
     delete products?.perfectSEO
     let key = appKey.replace(".ai", "");
     if (products) {
@@ -130,87 +153,33 @@ const useGoogleUser = (appKey) => {
         products = { ...products, [key]: new Date().toISOString() }
       }
     }
-    supabase
-      .from('profiles')
-      .update({ products: products, updated_at: new Date().toISOString() })
-      .eq('email', user?.email)
-      .select("*")
-      .then(res => {
-      })
+    return products;
   }
-
-
-  // updates products based on session and userdata
-  useEffect(() => {
-    if (session && userData && isLoggedIn) {
-      updateProducts()
-    }
-  }, [session])
-
-  // update user 
-  const updateUser = () => {
-    supabase
-      .from('profiles')
-      .select("*")
-      .eq('email', user.email)
-      .select()
-      .then(res => {
-
-        if (res?.data && res?.data?.length > 0) {
-          if (res?.data[0]) {
-            setUserData(res.data[0])
-            dispatch(setAdmin(res.data[0]?.admin))
-            dispatch(setProfile(res.data[0]))
-          }
-        }
-        else if (res?.data?.length === 0) {
-          let profileObj: any = { email: user.email }
-          if (user.email.includes("atidiv") || user.email.includes('loud.us')) {
-            profileObj = { ...profileObj, admin: true }
-          }
-          supabase
-            .from('profiles')
-            .insert(profileObj)
-            .select("*")
-            .then(res => {
-              if (!res.error) {
-                setUserData(profileObj)
-              }
-            })
-        }
-      })
-  }
-
-  // update user if email is available 
-  useEffect(() => {
-    if (user?.email && !profile) {
-      updateUser()
-    }
-  }, [user?.email, profile])
 
   // gets decoded token 
   function getDecodedAccessToken(token: string): any {
     try {
       return jwtDecode(token);
     } catch (Error) {
+      if (isDev) console.error('🔑 useGoogleUser: Token decode failed', Error);
       return 'failed';
     }
   }
 
   // checks domain to add to loud list 
   const checkDomain = (domain) => {
+
     supabase
       .from('domains')
       .select("*")
       .eq('domain', urlSanitization(domain))
-      .select()
       .then(res => {
         if (res.data.length === 0) {
           supabase
             .from('domains')
-            .insert([
+            .insert(
               { 'domain': urlSanitization(domain) }
-            ])
+            )
             .select()
         }
       })
@@ -218,122 +187,51 @@ const useGoogleUser = (appKey) => {
 
   // pulls all domains from Google 
   const fetchAllDomains = async () => {
+    console.log({ session, user, profile, email });
+    let bearerToken = session?.access_token
     try {
-      const { data } = await axios.get('https://www.googleapis.com/webmasters/v3/sites', { headers: { Authorization: `Bearer ${token}` } })
+      const { data } = await axios.get('https://www.googleapis.com/webmasters/v3/sites', { headers: { Authorization: `Bearer ${bearerToken}` } })
       if (data?.siteEntry) {
-        return data.siteEntry.map(obj => {
-          return ({
-            type: obj.siteUrl.split(":")[0],
-            siteUrl: urlSanitization(obj.siteUrl.split(":")[1]),
-            permissionLevel: obj.permissionLevel,
-            originalUrl: obj.siteUrl.split(":")[1]
+        let domains = data?.siteEntry
+          .map(obj => {
+            return ({
+              type: obj?.siteUrl.split(":")[0],
+              siteUrl: urlSanitization(obj?.siteUrl.split(":")[1]),
+              permissionLevel: obj?.permissionLevel,
+              originalUrl: obj?.siteUrl.split(":")[1]
+            })
           })
-        })
+        supabase
+          .from('user_history')
+          .insert({ email: email, transaction_data: { domains, url: window?.location?.href }, product: en.product, type: "Check Domains", action: "INFO" })
+          .select('*')
 
-      }
-      else return null
-    }
-    catch (err) {
-      console.log(err)
-      return null
-    }
-  }
+        supabase
+          .from('profiles')
+          .update({ email: email, domain_access: domains, domains: domains?.map((obj) => obj.siteUrl) })
+          .eq('email', email)
+          .select('*')
 
-  const retrieveSynopsisInfo = async (domain) => {
-    return getSynopsisInfo(domain, false)
-  }
-  useEffect(() => {
-
-    if (profile?.domain_access && !domainsInfo) {
-      let domains = profile.domain_access.map(({ siteUrl }) => urlSanitization(siteUrl))
-      Promise.allSettled(
-        domains.map(retrieveSynopsisInfo)).then((results) => {
-          let domains = results.map((result: any, index) => {
-            return result?.value?.data
+          .then(res => {
+            dispatch(setProfile({ ...profile, domain_access: domains, domains: domains?.map((obj) => obj.siteUrl) }))
           }
           )
-          dispatch(setDomainInfo(domains))
-        }
-        )
-    }
-  }, [profile?.domain_access, domainsInfo])
 
-  // checks user domains 
-  const checkUserDomains = async () => {
-    let domain_access = [];
-    try {
-      domain_access = await fetchAllDomains()
-      if (domain_access === null) {
-        return null;
+        return domains
+
+
       }
-      let domains = []
-
-      domain_access = domain_access.sort((a, b) => a.siteUrl.localeCompare(b.siteUrl))
-
-      if (domain_access?.length > 0) {
-        domains = domain_access.map(({ siteUrl }) => urlSanitization(siteUrl))
-
-
-        domains = domains.filter(obj => obj !== 'google' && obj !== "gmail").reduce((prev, curr) => {
-          if (prev.includes(curr)) return prev
-          else {
-            return [...prev, urlSanitization(curr)]
-          }
-        }, [])
-        domains = domains?.sort((a, b) => a.localeCompare(b))
-        domains = domains.filter((domain) => {
-          checkDomain(domain);
-          return domain !== ""
-        })
-        let profileObj: any = { ...userData, domain_access, domains };
-        dispatch(setProfile(profileObj))
-        supabase
-          .from('profiles')
-          .update(profileObj)
-          .eq('email', user?.email || profile?.email)
-          .select("*")
-          .then(res => {
-          })
-      }
-    }
-    catch (err) {
-      console.log(err)
+    } catch (error) {
+      const currentUrl = window.location.href;
+      supabase
+        .from('user_history')
+        .insert({ email: session.user.email || user.email || profile.email, transaction_data: { error, url: currentUrl, email }, product: en.product, type: "Check Domains", action: "Error" })
+        .select('*')
     }
   }
 
-  useEffect(() => {
-    let profiles;
-    if (userData) {
-      if (!profile?.full_name && user?.name) {
-        supabase
-          .from('profiles')
-          .update({ full_name: user.name })
-          .eq('email', user?.email)
-          .select("*")
-          .then(res => {
-            let profileObj = { ...userData, full_name: user.name }
-            dispatch(setProfile(profileObj));
-          })
-      }
-      profiles = supabase.channel('profile-channel')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'profiles', filter: `email=eq.${user?.email}` },
-          (payload) => {
-            updateUser()
-          }
-        )
-        .subscribe()
-    }
-    return () => {
-      if (profiles) {
-        profiles.unsubscribe()
-      }
-    }
-  }, [userData])
 
-
-  return ({ userData, updateUser, checkDomain, fetchAllDomains, getDecodedAccessToken })
+  return ({ checkDomain, fetchAllDomains, getDecodedAccessToken })
 }
 
 export default useGoogleUser;

@@ -79,7 +79,9 @@ export const Overlay = (
       return;
     }
     closeModal();
+    document.body.removeAttribute('style');
   };
+
 
   const escapeClick = (e) => {
     e.preventDefault();
@@ -91,6 +93,9 @@ export const Overlay = (
 
   useEffect(() => {
     setModalOpen(open);
+    if (open === false || open === null || !open) {
+      document.body.removeAttribute('style');
+    }
   }, [open]);
 
   const contentClasses = classNames('modal-content', {
@@ -119,7 +124,7 @@ export const Overlay = (
     <Dialog.Root open={modalOpen} onOpenChange={openChange} modal>
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClasses} onClick={onClick}>
-          <Dialog.Content aria-describedby={id || undefined} className={contentClasses} onInteractOutside={clickout} onPointerDownOutside={clickout} onEscapeKeyDown={escapeClick} id={id}>
+          <Dialog.Content aria-describedby={id || undefined} className={contentClasses} onInteractOutside={clickout} onPointerDownOutside={clickout} onEscapeKeyDown={escapeClick} id={id} title={id}>
             {closeIcon &&
               <button
                 aria-label="close modal"
@@ -177,7 +182,7 @@ export const Description = ({ children, className }: ModalChildProps) => {
 interface ModalHeadingProps {
   children: React.ReactNode,
   className?: string,
-  Icon?: React.ReactChild,
+  Icon?: React.ReactElement<any> | number | string,
   backFunc?: () => void,
 }
 
