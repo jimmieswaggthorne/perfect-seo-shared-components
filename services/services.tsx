@@ -599,6 +599,59 @@ export const regenerateHTMLfromDoc = (reqObj: Request.RegeneratePost) => {
   return axiosInstance.post(`https://content-v5.replit.app/regenerate_html_from_outline_guid${parseQueries(reqObj)}`, reqObj);
 }
 
+// ============================================
+// Cloudflare Worker Workflow API (content-worker)
+// ============================================
+const CLOUDFLARE_WORKER_URL = 'https://content-worker.brent-f06.workers.dev';
+
+/**
+ * Get workflow status from Cloudflare worker
+ */
+export const getWorkflowStatus = (guid: string) => {
+  return axiosInstance.get(`${CLOUDFLARE_WORKER_URL}/workflow/${guid}/status`);
+}
+
+/**
+ * Regenerate HTML only - keeps post_json intact, re-renders HTML from it.
+ * Use when you want to apply new template/rendering logic without regenerating content.
+ */
+export const regenerateHtmlOnly = (guid: string) => {
+  return axiosInstance.post(`${CLOUDFLARE_WORKER_URL}/workflow/${guid}/regenerate-html`);
+}
+
+/**
+ * Regenerate post_json and HTML - re-parses edited content to post_json, then renders HTML.
+ * Use when you want to re-apply markdown parsing (citations, references, structure).
+ */
+export const regeneratePostJson = (guid: string) => {
+  return axiosInstance.post(`${CLOUDFLARE_WORKER_URL}/workflow/${guid}/regenerate-postjson`);
+}
+
+/**
+ * Regenerate from a specific stage - more granular control.
+ * Valid stages: "researching", "drafting", "editing", "html_generation", "publishing"
+ */
+export const regenerateFromStage = (guid: string, stage: string, preserveContent: boolean = false) => {
+  return axiosInstance.post(`${CLOUDFLARE_WORKER_URL}/workflow/${guid}/regenerate`, {
+    stage,
+    preserveContent
+  });
+}
+
+/**
+ * Run/continue workflow processing
+ */
+export const runWorkflow = (guid: string) => {
+  return axiosInstance.post(`${CLOUDFLARE_WORKER_URL}/workflow/${guid}/run`);
+}
+
+/**
+ * Retry a failed workflow
+ */
+export const retryWorkflow = (guid: string) => {
+  return axiosInstance.post(`${CLOUDFLARE_WORKER_URL}/workflow/${guid}/retry`);
+}
+
 export const getPost = (guid: string) => {
   return supabase.from('tasks')
     .select('*').eq('task_id', guid).neq("is_deleted", true).order('created_at', { ascending: false })

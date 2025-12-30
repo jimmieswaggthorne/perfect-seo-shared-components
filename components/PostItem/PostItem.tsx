@@ -253,7 +253,15 @@ const PostItem = ({ post, refresh, domain_name }: PostItemProps) => {
         open={showRegeneratePost}
         onClose={() => { setShowRegeneratePost(null); refresh() }}
       >
-        <RegeneratePostModal submitGoogleDocRegenerateHandler={submitGoogleDocRegenerateHandler} submitHTMLStylingHandler={submitHTMLStylingHandler} onClose={() => { setShowRegeneratePost(null); }} type={GenerateTypes.REGENERATE} submitHandler={regeneratePostHandler} onSuccess={() => { setShowRegeneratePost(false); refresh() }} />
+        <RegeneratePostModal
+          submitGoogleDocRegenerateHandler={submitGoogleDocRegenerateHandler}
+          submitHTMLStylingHandler={submitHTMLStylingHandler}
+          onClose={() => { setShowRegeneratePost(null); }}
+          type={GenerateTypes.REGENERATE}
+          submitHandler={regeneratePostHandler}
+          onSuccess={() => { setShowRegeneratePost(false); refresh() }}
+          contentPlanOutlineGuid={localPost?.content_plan_outline_guid}
+        />
       </Modal.Overlay >
       <Modal.Overlay closeIcon open={showLivePost} onClose={() => setShowLivePost(false)} className="modal-small">
         <Modal.Title title="Add Live URL" />

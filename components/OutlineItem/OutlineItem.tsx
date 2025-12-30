@@ -210,7 +210,15 @@ const OutlineItem = ({ outline, refresh, domain_name, setModalOpen }) => {
         open={showGenerate}
         onClose={() => { setShowGenerate(false); refresh() }}
       >
-        <RegeneratePostModal submitGoogleDocRegenerateHandler={submitGoogleDocRegenerateHandler} submitHTMLStylingHandler={submitHTMLStylingHandler} onClose={() => { setShowGenerate(false); }} type={GenerateTypes.GENERATE} submitHandler={generatePostHandler} onSuccess={() => { setShowGenerate(false); refresh() }} />
+        <RegeneratePostModal
+          submitGoogleDocRegenerateHandler={submitGoogleDocRegenerateHandler}
+          submitHTMLStylingHandler={submitHTMLStylingHandler}
+          onClose={() => { setShowGenerate(false); }}
+          type={GenerateTypes.GENERATE}
+          submitHandler={generatePostHandler}
+          onSuccess={() => { setShowGenerate(false); refresh() }}
+          contentPlanOutlineGuid={outline.guid}
+        />
       </Modal.Overlay >
       <Modal.Overlay open={deleteModal} onClose={() => { setDeleteModal(null) }}>
         <Modal.Title title="Delete Outline" />
